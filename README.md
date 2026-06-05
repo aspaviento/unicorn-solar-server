@@ -11,6 +11,9 @@
     * [Set unicorn to available](#available)
     * [Set unicorn to busy](#busy)
     * [Set unicorn to away](#away)
+    * [Set unicorn to out of office](#out-of-office)
+    * [Set unicorn to appear offline](#appear-offline)
+    * [Set unicorn to do not disturb](#do-not-disturb)
     * [Reset the overwritten status](#reset)
 * [Todo](#Todo)
 * [License](#License)
@@ -19,6 +22,8 @@
 
 This is a project to create a busy light from both the Pimoroni [Unicorn Phat](https://shop.pimoroni.com/products/unicorn-phat) and [Unicorn Mini](https://shop.pimoroni.com/products/unicorn-hat-mini).
 
+This project is based on Elio Struyf's work available at [estruyf/unicorn-busy-server](https://github.com/estruyf/unicorn-busy-server).
+
 The service itself has the following features:
 
 * Installation script to simplify the process
@@ -26,6 +31,30 @@ The service itself has the following features:
 * APIs for changing the colors
 * Rainbow effect
 * Front-end to show the current status and manually set its status
+
+# Main changes in this version
+
+Compared with the original project, this version includes the following main differences, fixes, and improvements:
+
+* The default HTTP port changed from `5000` to `9000` to avoid conflicts with AirPlay Receiver.
+* The front-end was migrated from Create React App and `react-scripts` to Vite, React 19, and TypeScript 5.
+* Front-end dependencies were updated and the production dependency audit currently reports no known vulnerabilities.
+* The front-end now supports automatic light/dark mode using the browser color-scheme preference.
+* Front-end labels and descriptions are centralized in `frontend/src/content.ts`.
+* A built-in `API docs` page was added to the front-end.
+* The UI now includes a horizontal 17x7 simulated Pimoroni Unicorn HAT Mini matrix preview for each state.
+* Additional manual status endpoints were added:
+  * `/api/out-of-office` for `Out of office` in blue.
+  * `/api/appear-offline` for `Appear Offline` in gray.
+  * `/api/do-not-disturb` for `Do not Disturb` in purple.
+* `/api/switch` recognizes the RGB values for the additional statuses.
+* The server now validates JSON request bodies and RGB, brightness, and speed ranges before applying changes.
+* Animation thread handling was improved so previous animations are stopped before starting a new one.
+* Hardware writes are guarded with a lock to reduce concurrent access issues.
+* The Unicorn wrapper can run in a dummy mode for local development without physical hardware.
+* The wrapper avoids importing hardware libraries when running without root permissions, which makes local diagnostics safer.
+* `htmlToRGB` was fixed to use equality comparison and return a valid RGB tuple.
+* `/api/status` no longer fails when CPU temperature cannot be read outside Raspberry Pi environments.
 
 # Installation
 
@@ -74,9 +103,11 @@ Usage:
 
 If you've run the install script (without the -d option) check the Unicorn hat attache to your Pi.  If all has gone according to plan the unicorn hat will be changing colours.  Once its going through all 360 Hues within the HSV spectrum it'll go blank.  As soon as the Uniron hat lights up the `Busylight Server` is ready to start receiving commands.
 
-The front-end is available via `http://<your-ip>:5000/`.
+The front-end is available via `http://<your-ip>:9000/`.
 
 ![Front-end](./assets/frontend.png)
+
+Front-end labels and descriptions can be edited in `frontend/src/content.ts`.
 
 The API is fairly simple though has been extend quite a bit from its orignal implementation.  The Busy server has the following API endpoing:
 
@@ -90,6 +121,9 @@ The API is fairly simple though has been extend quite a bit from its orignal imp
 | [<span style="color: blue">**GET**</span> <span style="color: green">**POST**</span>](#available)  | [`/api/available`](#available)  | Set the unicorn to the `available` status color. This overwrites the status. Call [`/api/switch`](#reset) to turn off.  |
 | [<span style="color: blue">**GET**</span> <span style="color: green">**POST**</span>](#busy)       | [`/api/busy`](#busy)       | Set the unicorn to the `busy` status color. This overwrites the status. Call [`/api/switch`](#reset) to turn off.  |
 | [<span style="color: blue">**GET**</span> <span style="color: green">**POST**</span>](#away)       | [`/api/away`](#away)       | Set the unicorn to the `away` status color. This overwrites the status. Call [`/api/switch`](#reset) to turn off.  |
+| [<span style="color: blue">**GET**</span> <span style="color: green">**POST**</span>](#out-of-office) | [`/api/out-of-office`](#out-of-office) | Set the unicorn to the `out of office` status color. This overwrites the status. Call [`/api/switch`](#reset) to turn off. |
+| [<span style="color: blue">**GET**</span> <span style="color: green">**POST**</span>](#appear-offline) | [`/api/appear-offline`](#appear-offline) | Set the unicorn to the `appear offline` status color. This overwrites the status. Call [`/api/switch`](#reset) to turn off. |
+| [<span style="color: blue">**GET**</span> <span style="color: green">**POST**</span>](#do-not-disturb) | [`/api/do-not-disturb`](#do-not-disturb) | Set the unicorn to the `do not disturb` status color. This overwrites the status. Call [`/api/switch`](#reset) to turn off. |
 | [<span style="color: blue">**GET**</span> <span style="color: green">**POST**</span>](#reset)      | [`/api/reset`](#reset)      | Resets the status overwrite setting. This way, the [`/api/switch`](#rgb) can be called again. |
 
 ## <a id="on"></a> Set the Unicorn to On
@@ -262,6 +296,51 @@ Returns `200 OK` and an Empty JSON Object `{}`
 ### Description
 
 Overrides the status to `away`. This way, any call coming in to the [`/api/switch`](#rgb) endpoint will be ignored. You will have to call the [`/api/reset`](#reset) endpoint in order to remove the override.
+
+### Result
+
+Returns `200 OK` and an Empty JSON Object `{}`
+
+
+## <a id="out-of-office"></a> Set the Unicorn to out of office
+
+| Method                                      | Endpoint  |
+|:-------------------------------------------:|-----------|
+| <span style="color: blue">**GET**</span> <span style="color: blue">**POST**</span>    | `/api/out-of-office` |
+
+### Description
+
+Overrides the status to `out of office`. This way, any call coming in to the [`/api/switch`](#rgb) endpoint will be ignored. You will have to call the [`/api/reset`](#reset) endpoint in order to remove the override.
+
+### Result
+
+Returns `200 OK` and an Empty JSON Object `{}`
+
+
+## <a id="appear-offline"></a> Set the Unicorn to appear offline
+
+| Method                                      | Endpoint  |
+|:-------------------------------------------:|-----------|
+| <span style="color: blue">**GET**</span> <span style="color: blue">**POST**</span>    | `/api/appear-offline` |
+
+### Description
+
+Overrides the status to `appear offline`. This way, any call coming in to the [`/api/switch`](#rgb) endpoint will be ignored. You will have to call the [`/api/reset`](#reset) endpoint in order to remove the override.
+
+### Result
+
+Returns `200 OK` and an Empty JSON Object `{}`
+
+
+## <a id="do-not-disturb"></a> Set the Unicorn to do not disturb
+
+| Method                                      | Endpoint  |
+|:-------------------------------------------:|-----------|
+| <span style="color: blue">**GET**</span> <span style="color: blue">**POST**</span>    | `/api/do-not-disturb` |
+
+### Description
+
+Overrides the status to `do not disturb`. This way, any call coming in to the [`/api/switch`](#rgb) endpoint will be ignored. You will have to call the [`/api/reset`](#reset) endpoint in order to remove the override.
 
 ### Result
 

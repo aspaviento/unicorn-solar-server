@@ -1,4 +1,17 @@
-/* Main styles */
+html {
+  color-scheme: light dark;
+}
+
+body {
+  margin: 0;
+  background: #f6f7f9;
+}
+
+@media (prefers-color-scheme: dark) {
+  body {
+    background: #101318;
+  }
+}
 
 form {
 	margin-bottom: 0.2em;
@@ -6,10 +19,4 @@ form {
 
 p {
 	margin-bottom: 1em;
-}
-
-.rainbow {
-  color: #000;
-  text-shadow: 1px 1px #fff;
-	background-image: linear-gradient(to right, red,orange,yellow,green,blue,indigo,violet);
 }
