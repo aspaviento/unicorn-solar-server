@@ -15,7 +15,6 @@
     * [Set unicorn to appear offline](#appear-offline)
     * [Set unicorn to do not disturb](#do-not-disturb)
     * [Reset the overwritten status](#reset)
-* [Todo](#Todo)
 * [License](#License)
 
 # Introduction
@@ -361,11 +360,6 @@ Resets the status override state so that the [`/api/switch`](#rgb) endpoint will
 
 Returns `200 OK` and an Empty JSON Object `{}`
 
-
-# Todo
-
-- [ ] Add support for the [Unicorn Hat](https://shop.pimoroni.com/products/unicorn-hat)
-- [x] Add front-end
 
 # License
 
