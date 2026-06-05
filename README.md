@@ -1,6 +1,7 @@
 # Simple server for Raspberry Pi with Pimoroni Unicorn hat
 
 * [Introduction](#Introduction)
+* [Development](#Development)
 * [Installation](#Installation)
 * [Usage](#Usage)
     * [Set the unicorn to On](#on)
@@ -32,6 +33,10 @@ The service itself has the following features:
 * APIs for changing the colors
 * Rainbow effect
 * Front-end to show the current status and manually set its status
+
+# Development
+
+This project was developed with assistance from OpenAI Codex.
 
 # Main changes in this version
 
