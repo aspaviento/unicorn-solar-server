@@ -21,6 +21,8 @@
 
 This is a project to create a busy light from both the Pimoroni [Unicorn Phat](https://shop.pimoroni.com/products/unicorn-phat) and [Unicorn Mini](https://shop.pimoroni.com/products/unicorn-hat-mini).
 
+Although it should work in other compatible Raspberry Pi and Pimoroni Unicorn configurations, this version has been tested with a Raspberry Pi Zero 2 W and a Pimoroni Unicorn HAT Mini.
+
 This project is based on Elio Struyf's work available at [estruyf/unicorn-busy-server](https://github.com/estruyf/unicorn-busy-server).
 
 The service itself has the following features:
@@ -100,7 +102,7 @@ Usage:
 
 # Usage
 
-If you've run the install script (without the -d option) check the Unicorn hat attache to your Pi.  If all has gone according to plan the unicorn hat will be changing colours.  Once its going through all 360 Hues within the HSV spectrum it'll go blank.  As soon as the Uniron hat lights up the `Busylight Server` is ready to start receiving commands.
+If you've run the install script (without the -d option) check the Unicorn hat attache to your Pi.  If all has gone according to plan the unicorn hat will be changing colours.  Once its going through all 360 Hues within the HSV spectrum it'll go blank.  As soon as the Unicorn hat lights up the `Busylight Server` is ready to start receiving commands.
 
 The front-end is available via `http://<your-ip>:9000/`.
 
