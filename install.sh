@@ -111,7 +111,7 @@ if [ $FILECHECK == 'false' ]; then
         INSTALL_DIR="$INSTALL_DIR/unicorn-busy-server"
     fi
     show_msg "${GREEN}Cloning files from git using HTTPS to ${BOLD}${INSTALL_DIR}${NORMAL}${GREEN}...${NORMAL}"
-    git clone -q https://github.com/estruyf/unicorn-busy-server.git $INSTALL_DIR
+    git clone -q https://github.com/aspaviento/unicorn-busy-server.git $INSTALL_DIR
     chown -R $SUDO_USER:$SUDO_USER $INSTALL_DIR
     cd $INSTALL_DIR
 fi

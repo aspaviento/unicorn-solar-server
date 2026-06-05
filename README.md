@@ -63,15 +63,15 @@ In order to install this on your Raspberry Pi, you can follow the next steps:
 Copy and paste the following in to a terminal. It will install all the required files, enable, and start the service.  If you are running Raspbian or Ubuntu, you can use the following installation command:
 
 ```bash
-curl -LSs https://raw.githubusercontent.com/estruyf/unicorn-busy-server/master/install.sh | sudo bash -
+curl -LSs https://raw.githubusercontent.com/aspaviento/unicorn-busy-server/master/install.sh | sudo bash -
 ```
 
 If there might be a trust issue while running the command, you could try the following:
 
 ```bash
 cd /tmp
-curl -LSs https://raw.githubusercontent.com/estruyf/unicorn-busy-server/master/install.sh
-cat install | more # So you can see the contents of the script a page at time
+curl -LSs -o install.sh https://raw.githubusercontent.com/aspaviento/unicorn-busy-server/master/install.sh
+cat install.sh | more # So you can see the contents of the script a page at time
 sudo bash ./install.sh -V -i /home/pi/unicorn-busy-server
 ```
 
@@ -80,7 +80,7 @@ sudo bash ./install.sh -V -i /home/pi/unicorn-busy-server
 If you want to clone/fork this repo and carry on development on a more sensible machine, you can install the required files without needing to install the service by doing the following:
 
 ```bash
-curl -LSs https://raw.githubusercontent.com/estruyf/unicorn-busy-server/master/install.sh
+curl -LSs -o install.sh https://raw.githubusercontent.com/aspaviento/unicorn-busy-server/master/install.sh
 bash ./install.sh -d
 ```
 
