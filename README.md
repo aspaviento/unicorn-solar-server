@@ -12,6 +12,8 @@ The project provides:
 - A systemd service and Raspberry Pi installation scripts.
 - A hardware-free dummy mode for local development and automated tests.
 
+![Unicorn Solar Server control panel](./assets/frontend.jpg)
+
 ## Project lineage
 
 Unicorn Solar Server is derived from
