@@ -157,6 +157,14 @@ export function App() {
           ))}
         </div>
       </section>
+
+      <section className="control-panel">
+        <h2>{content.panel.displaySection}</h2>
+        <div className="button-row">
+          <button onClick={() => post('/api/rainbow', {})}>{content.panel.rainbow}</button>
+          <button onClick={() => post('/api/off', {})}>{content.panel.off}</button>
+        </div>
+      </section>
     </main>
   );
 }

@@ -141,6 +141,7 @@ class UnicornWrapper:
 
     def off(self):
         if self.hat is None:
+            self.clear()
             return None
         self.hat.clear()
         self.hat.show()

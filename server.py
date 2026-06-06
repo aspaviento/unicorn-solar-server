@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 
 import json
+import math
 import os
 import threading
 from datetime import datetime, timezone
+from time import monotonic, sleep
 
 from flask import Flask, jsonify, make_response, request, send_from_directory
 from flask_cors import CORS
@@ -28,6 +30,7 @@ DISPLAY_HEIGHT = 7
 DEFAULT_PORT = 9001
 
 hardware_lock = threading.RLock()
+animation_thread = None
 unicorn = UnicornWrapper()
 width, height = unicorn.getShape()
 if (width, height) != (DISPLAY_WIDTH, DISPLAY_HEIGHT):
@@ -39,6 +42,7 @@ state = {
     'percentage': 0,
     'flow': 'charging',
     'tariff': 'medium',
+    'displayMode': 'solar',
     'lastCalled': None,
     'lastCalledApi': None,
 }
@@ -48,7 +52,7 @@ class SolarFlaskApp(Flask):
     def run(self, host=None, port=None, debug=None, load_dotenv=True, **options):
         if not self.debug or os.getenv('WERKZEUG_RUN_MAIN') == 'true':
             with self.app_context():
-                render_display()
+                start_rainbow()
         super().run(host=host, port=port, debug=debug, load_dotenv=load_dotenv, **options)
 
 
@@ -71,6 +75,15 @@ def validate_choice(content, field, choices):
     value = content.get(field)
     if value not in choices:
         return None, f'{field} must be one of: {", ".join(choices)}'
+    return value, None
+
+
+def validate_number(content, field, minimum, maximum, default):
+    value = content.get(field, default)
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None, f'{field} must be a number'
+    if value < minimum or value > maximum:
+        return None, f'{field} must be between {minimum} and {maximum}'
     return value, None
 
 
@@ -100,6 +113,69 @@ def render_display():
         unicorn.show()
 
 
+def stop_animation():
+    global animation_thread
+    if animation_thread is not None:
+        animation_thread.do_run = False
+        if animation_thread != threading.current_thread():
+            animation_thread.join(timeout=1)
+        animation_thread = None
+
+
+def sleep_while_running(thread, seconds):
+    end = monotonic() + seconds
+    while getattr(thread, 'do_run', True):
+        remaining = end - monotonic()
+        if remaining <= 0:
+            return
+        sleep(min(0.05, remaining))
+
+
+def display_rainbow(brightness, speed):
+    current_thread = threading.current_thread()
+    offset = 30
+    frame = 0.0
+    while getattr(current_thread, 'do_run', True):
+        frame += 0.3
+        with hardware_lock:
+            unicorn.setBrightness(brightness)
+            for x in range(DISPLAY_WIDTH):
+                for y in range(DISPLAY_HEIGHT):
+                    red = (math.cos((x + frame) / 2.0) + math.cos((y + frame) / 2.0)) * 64.0 + 128.0
+                    green = (math.sin((x + frame) / 1.5) + math.sin((y + frame) / 2.0)) * 64.0 + 128.0
+                    blue = (math.sin((x + frame) / 2.0) + math.cos((y + frame) / 1.5)) * 64.0 + 128.0
+                    set_pixel(
+                        x,
+                        y,
+                        tuple(int(max(0, min(255, color + offset))) for color in (red, green, blue)),
+                    )
+            unicorn.show()
+        sleep_while_running(current_thread, speed)
+
+
+def start_rainbow(brightness=1, speed=0.1):
+    global animation_thread
+    stop_animation()
+    state['displayMode'] = 'rainbow'
+    animation_thread = threading.Thread(target=display_rainbow, args=(brightness, speed), daemon=True)
+    animation_thread.do_run = True
+    animation_thread.start()
+
+
+def switch_off():
+    stop_animation()
+    state['displayMode'] = 'off'
+    with hardware_lock:
+        unicorn.clear()
+        unicorn.off()
+
+
+def render_solar_display():
+    stop_animation()
+    state['displayMode'] = 'solar'
+    render_display()
+
+
 def touch(endpoint):
     state['lastCalledApi'] = endpoint
     state['lastCalled'] = datetime.now(timezone.utc).isoformat()
@@ -121,6 +197,19 @@ def root():
     return send_from_directory(app.static_folder, 'index.html')
 
 
+@app.route('/api/', methods=['GET'])
+def api_index():
+    return jsonify({
+        'endpoints': {
+            'battery': {'methods': ['POST'], 'path': '/api/battery'},
+            'off': {'methods': ['GET', 'POST'], 'path': '/api/off'},
+            'rainbow': {'methods': ['POST'], 'path': '/api/rainbow'},
+            'status': {'methods': ['GET'], 'path': '/api/status'},
+            'tariff': {'methods': ['POST'], 'path': '/api/tariff'},
+        }
+    })
+
+
 @app.route('/api/battery', methods=['POST'])
 def api_battery():
     content, error_response = read_json_body()
@@ -139,7 +228,7 @@ def api_battery():
     state['percentage'] = percentage
     state['flow'] = flow
     touch('/api/battery')
-    render_display()
+    render_solar_display()
     return jsonify(status_payload())
 
 
@@ -153,7 +242,30 @@ def api_tariff():
         return make_response(jsonify({'error': error}), 400)
     state['tariff'] = level
     touch('/api/tariff')
-    render_display()
+    render_solar_display()
+    return jsonify(status_payload())
+
+
+@app.route('/api/off', methods=['GET', 'POST'])
+def api_off():
+    touch('/api/off')
+    switch_off()
+    return jsonify(status_payload())
+
+
+@app.route('/api/rainbow', methods=['POST'])
+def api_rainbow():
+    content, error_response = read_json_body()
+    if error_response is not None:
+        return error_response
+    brightness, error = validate_number(content, 'brightness', 0, 1, 1)
+    if error:
+        return make_response(jsonify({'error': error}), 400)
+    speed, error = validate_number(content, 'speed', 0.01, 60, 0.1)
+    if error:
+        return make_response(jsonify({'error': error}), 400)
+    touch('/api/rainbow')
+    start_rainbow(brightness, speed)
     return jsonify(status_payload())
 
 

@@ -12,6 +12,9 @@ export const content = {
     batterySection: 'Battery and energy flow',
     percentageLabel: (percentage: number) => `Percentage: ${percentage}%`,
     tariffSection: 'Electricity tariff',
+    displaySection: 'Display controls',
+    rainbow: 'Rainbow',
+    off: 'Off',
     flows: {
       charging: 'Charging',
       discharging: 'Discharging',
@@ -32,6 +35,12 @@ export const content = {
     descriptionLabel: 'Description',
     endpoints: [
       {
+        methods: ['GET'],
+        endpoint: '/api/',
+        request: 'None',
+        description: 'Returns the available Solar Server API endpoints.',
+      },
+      {
         methods: ['POST'],
         endpoint: '/api/battery',
         request: '{"percentage": 65, "flow": "charging"}',
@@ -48,6 +57,18 @@ export const content = {
         endpoint: '/api/status',
         request: 'None',
         description: 'Returns percentage, active bars, flow, tariff, display dimensions, rotation, hardware type, and last update information.',
+      },
+      {
+        methods: ['POST'],
+        endpoint: '/api/rainbow',
+        request: '{"brightness": 1, "speed": 0.1}',
+        description: 'Starts the hardware validation rainbow. Brightness and speed are optional.',
+      },
+      {
+        methods: ['GET', 'POST'],
+        endpoint: '/api/off',
+        request: 'None',
+        description: 'Stops any animation and turns off every display pixel.',
       },
     ],
   },

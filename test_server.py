@@ -9,8 +9,12 @@ from lib import unicorn_wrapper
 class SolarServerTest(unittest.TestCase):
     def setUp(self):
         self.client = server.app.test_client()
-        server.state.update({'percentage': 0, 'flow': 'charging', 'tariff': 'medium'})
-        server.render_display()
+        server.stop_animation()
+        server.state.update({'percentage': 0, 'flow': 'charging', 'tariff': 'medium', 'displayMode': 'solar'})
+        server.render_solar_display()
+
+    def tearDown(self):
+        server.stop_animation()
 
     def post_battery(self, percentage, flow='charging'):
         return self.client.post('/api/battery', json={'percentage': percentage, 'flow': flow})
@@ -81,6 +85,39 @@ class SolarServerTest(unittest.TestCase):
         self.assertEqual(response.json['width'], 17)
         self.assertEqual(response.json['height'], 7)
         self.assertEqual(response.json['rotation'], 0)
+        self.assertEqual(response.json['displayMode'], 'solar')
+
+    def test_api_index_lists_available_options(self):
+        response = self.client.get('/api/')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json['endpoints']['off']['path'], '/api/off')
+        self.assertEqual(response.json['endpoints']['rainbow']['path'], '/api/rainbow')
+
+    def test_off_turns_off_every_pixel(self):
+        self.post_battery(100, 'charging')
+        response = self.client.post('/api/off')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json['displayMode'], 'off')
+        self.assertTrue(all(
+            server.unicorn.pixels[x][y] == (0, 0, 0)
+            for x in range(server.DISPLAY_WIDTH)
+            for y in range(server.DISPLAY_HEIGHT)
+        ))
+
+    def test_rainbow_starts_and_solar_update_stops_animation(self):
+        response = self.client.post('/api/rainbow', json={'brightness': 0.8, 'speed': 0.01})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json['displayMode'], 'rainbow')
+        self.assertIsNotNone(server.animation_thread)
+
+        response = self.post_battery(20, 'charging')
+        self.assertEqual(response.json['displayMode'], 'solar')
+        self.assertIsNone(server.animation_thread)
+        self.assertEqual(server.unicorn.pixels[14][1], server.FLOW_COLORS['charging'])
+
+    def test_rainbow_rejects_invalid_values(self):
+        self.assertEqual(self.client.post('/api/rainbow', json={'brightness': 2}).status_code, 400)
+        self.assertEqual(self.client.post('/api/rainbow', json={'speed': 0}).status_code, 400)
 
     def test_display_contract_is_native_unicorn_hat_mini_shape(self):
         self.assertEqual((server.width, server.height), (17, 7))

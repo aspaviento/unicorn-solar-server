@@ -11,6 +11,8 @@ The project provides:
 - Built-in API documentation.
 - A systemd service and Raspberry Pi installation scripts.
 - A hardware-free dummy mode for local development and automated tests.
+- A startup rainbow that confirms the Unicorn HAT Mini is working before the
+  first solar update arrives.
 
 ![Unicorn Solar Server control panel](./assets/frontend.jpg)
 
@@ -77,6 +79,35 @@ GET /api/status
 
 The response includes the current solar state, active bars, hardware type,
 display dimensions, and rotation.
+
+### Discover endpoints
+
+```http
+GET /api/
+```
+
+### Validate the display
+
+The server starts with this rainbow animation instead of showing an empty
+battery, making hardware and service startup failures easier to identify.
+
+```http
+POST /api/rainbow
+Content-Type: application/json
+
+{"brightness": 1, "speed": 0.1}
+```
+
+Both values are optional.
+
+### Turn off the display
+
+```http
+GET /api/off
+```
+
+`POST /api/off` is also accepted. Any battery or tariff update stops the
+rainbow or off state and restores the solar display.
 
 ## Installation
 
