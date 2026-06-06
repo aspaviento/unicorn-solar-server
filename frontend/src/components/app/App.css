@@ -277,6 +277,47 @@
   box-shadow: var(--app-shadow);
 }
 
+.control-panel {
+  max-width: 920px;
+  margin: 24px auto 0;
+  padding: 24px 28px;
+  border: 1px solid var(--app-border);
+  border-radius: 8px;
+  background: var(--app-panel);
+}
+
+.control-panel h2,
+.docs-panel h2 {
+  margin-top: 0;
+}
+
+.control-panel input[type="range"] {
+  width: 100%;
+  margin: 18px 0;
+}
+
+.button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.button-row button {
+  min-height: 42px;
+  padding: 0 16px;
+  border: 1px solid var(--app-border);
+  border-radius: 8px;
+  background: var(--app-panel-subtle);
+  color: var(--app-text);
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.button-row button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
 .docs-header h1 {
   margin: 0;
   color: var(--app-text);
@@ -303,7 +344,7 @@
 
 .docs-row {
   display: grid;
-  grid-template-columns: 160px minmax(190px, 240px) minmax(0, 1fr);
+  grid-template-columns: 90px minmax(150px, 190px) minmax(220px, 1fr) minmax(0, 1.5fr);
   gap: 14px;
   align-items: center;
   padding: 14px 16px;
@@ -339,6 +380,11 @@
 
 .docs-row .endpoint {
   width: fit-content;
+}
+
+.docs-row .request-body {
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 @media (max-width: 760px) {

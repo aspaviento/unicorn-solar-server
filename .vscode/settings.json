@@ -1,8 +1,5 @@
 {
   "exportall.config.folderListener": [
-    "/frontend/src/components/app",
-    "/frontend/src/components/status",
-    "/frontend/src/models",
-    "/frontend/src/components/statusButton"
+    "/frontend/src/components/app"
   ]
 }

@@ -1,382 +1,161 @@
-# Simple server for Raspberry Pi with Pimoroni Unicorn hat
+# Unicorn Solar Server
 
-* [Introduction](#Introduction)
-* [Development](#Development)
-* [Installation](#Installation)
-* [Usage](#Usage)
-    * [Set the unicorn to On](#on)
-    * [Set the unicorn to Off](#off)
-    * [Get the server Status](#status)
-    * [Set unicorn to show a Rainbow](#rainbow)
-    * [Set unicorn to a colour using RGB](#rgb)
-    * [Set unicorn to available](#available)
-    * [Set unicorn to busy](#busy)
-    * [Set unicorn to away](#away)
-    * [Set unicorn to out of office](#out-of-office)
-    * [Set unicorn to appear offline](#appear-offline)
-    * [Set unicorn to do not disturb](#do-not-disturb)
-    * [Reset the overwritten status](#reset)
-* [License](#License)
+Display the battery, energy flow, and current electricity tariff of a domestic
+solar installation on a Raspberry Pi with a Pimoroni Unicorn HAT Mini.
 
-# Introduction
+The project provides:
 
-This is a project to create a busy light from both the Pimoroni [Unicorn Phat](https://shop.pimoroni.com/products/unicorn-phat) and [Unicorn Mini](https://shop.pimoroni.com/products/unicorn-hat-mini).
+- A 17x7 battery display designed for Unicorn HAT Mini.
+- A validated HTTP API for external solar-monitoring scripts.
+- A responsive React control panel with a simulated matrix preview.
+- Built-in API documentation.
+- A systemd service and Raspberry Pi installation scripts.
+- A hardware-free dummy mode for local development and automated tests.
 
-Although it should work in other compatible Raspberry Pi and Pimoroni Unicorn configurations, this version has been tested with a Raspberry Pi Zero 2 W and a Pimoroni Unicorn HAT Mini.
+## Project lineage
 
-This project is based on Elio Struyf's work available at [estruyf/unicorn-busy-server](https://github.com/estruyf/unicorn-busy-server).
+Unicorn Solar Server is derived from
+[aspaviento/unicorn-busy-server](https://github.com/aspaviento/unicorn-busy-server),
+which is itself based on
+[estruyf/unicorn-busy-server](https://github.com/estruyf/unicorn-busy-server).
 
-The service itself has the following features:
+The derived project reuses the Flask/Vite structure and Unicorn hardware
+wrapper, but replaces the busy-light behavior with a solar battery display and
+a dedicated API. It was developed with assistance from OpenAI Codex.
 
-* Installation script to simplify the process
-* APIs for turning the Unicorn on/off
-* APIs for changing the colors
-* Rainbow effect
-* Front-end to show the current status and manually set its status
+## Display
 
-# Development
+The server requires the Unicorn HAT Mini's native 17x7 orientation. It sets
+rotation `0` and refuses to start with a different display shape so the battery
+cannot be silently cropped or rotated.
 
-This project was developed with assistance from OpenAI Codex.
+- White pixels form the battery outline.
+- Five inner bars represent battery percentage in 20% steps, filling from
+  right to left.
+- `0%` lights no bars.
+- `1-20%`, `21-40%`, `41-60%`, `61-80%`, and `81-100%` light one through five
+  bars respectively.
+- Green bars mean charging.
+- Red bars mean discharging.
+- Blue bars mean exporting surplus energy. Exporting is accepted only at
+  `100%`.
+- The three-pixel battery terminal represents the electricity tariff: green
+  for low, yellow for medium, and red for high.
 
-# Main changes in this version
+## API
 
-Compared with the original project, this version includes the following main differences, fixes, and improvements:
+### Update battery
 
-* The default HTTP port changed from `5000` to `9000` to avoid conflicts with AirPlay Receiver.
-* The front-end was migrated from Create React App and `react-scripts` to Vite, React 19, and TypeScript 5.
-* Front-end dependencies were updated and the production dependency audit currently reports no known vulnerabilities.
-* The front-end now supports automatic light/dark mode using the browser color-scheme preference.
-* Front-end labels and descriptions are centralized in `frontend/src/content.ts`.
-* A built-in `API docs` page was added to the front-end.
-* The UI now includes a horizontal 17x7 simulated Pimoroni Unicorn HAT Mini matrix preview for each state.
-* Additional manual status endpoints were added:
-  * `/api/out-of-office` for `Out of office` in blue.
-  * `/api/appear-offline` for `Appear Offline` in gray.
-  * `/api/do-not-disturb` for `Do not Disturb` in purple.
-* `/api/switch` recognizes the RGB values for the additional statuses.
-* The server now validates JSON request bodies and RGB, brightness, and speed ranges before applying changes.
-* Animation thread handling was improved so previous animations are stopped before starting a new one.
-* Hardware writes are guarded with a lock to reduce concurrent access issues.
-* The Unicorn wrapper can run in a dummy mode for local development without physical hardware.
-* The wrapper avoids importing hardware libraries when running without root permissions, which makes local diagnostics safer.
-* `htmlToRGB` was fixed to use equality comparison and return a valid RGB tuple.
-* `/api/status` no longer fails when CPU temperature cannot be read outside Raspberry Pi environments.
+```http
+POST /api/battery
+Content-Type: application/json
 
-# Installation
+{"percentage": 65, "flow": "charging"}
+```
 
-In order to install this on your Raspberry Pi, you can follow the next steps:
+`percentage` accepts any number from `0` to `100`. `flow` accepts `charging`,
+`discharging`, or `exporting`.
 
-Copy and paste the following in to a terminal. It will install all the required files, enable, and start the service.  If you are running Raspbian or Ubuntu, you can use the following installation command:
+### Update tariff
+
+```http
+POST /api/tariff
+Content-Type: application/json
+
+{"level": "low"}
+```
+
+`level` accepts `low`, `medium`, or `high`.
+
+### Read status
+
+```http
+GET /api/status
+```
+
+The response includes the current solar state, active bars, hardware type,
+display dimensions, and rotation.
+
+## Installation
+
+The installer supports Raspberry Pi OS and Ubuntu:
 
 ```bash
-curl -LSs https://raw.githubusercontent.com/aspaviento/unicorn-busy-server/master/install.sh | sudo bash -
+curl -LSs https://raw.githubusercontent.com/aspaviento/unicorn-solar-server/master/install.sh | sudo bash -
 ```
 
-If there might be a trust issue while running the command, you could try the following:
+Solar Server is installed as `unicorn-solar.service` and listens on port
+`9001`.
 
 ```bash
-cd /tmp
-curl -LSs -o install.sh https://raw.githubusercontent.com/aspaviento/unicorn-busy-server/master/install.sh
-cat install.sh | more # So you can see the contents of the script a page at time
-sudo bash ./install.sh -V -i /home/pi/unicorn-busy-server
+systemctl status unicorn-solar.service
 ```
 
-> **Important**: Currently the script only runs on Raspbian/Ubuntu. Feel free to submit a pull request to extend the PR to support other distributions. Or you can make use of the old installation script: `install-fallback.sh`.
+Open the control panel at:
 
-If you want to clone/fork this repo and carry on development on a more sensible machine, you can install the required files without needing to install the service by doing the following:
+```text
+http://<raspberry-pi-ip>:9001/
+```
+
+## Coexisting with Unicorn Busy Server
+
+Both projects can be installed on the same Raspberry Pi:
+
+| Project | systemd service | HTTP port |
+|---|---|---:|
+| Unicorn Busy Server | `busylight.service` | `9000` |
+| Unicorn Solar Server | `unicorn-solar.service` | `9001` |
+
+Only one service should control the Unicorn HAT Mini at a time. Solar Server's
+systemd unit conflicts with `busylight.service`, so starting Solar Server stops
+Busy Server. The installer also disables Busy Server to ensure Solar Server
+remains the selected service after a reboot.
+
+Activate Solar Server:
 
 ```bash
-curl -LSs -o install.sh https://raw.githubusercontent.com/aspaviento/unicorn-busy-server/master/install.sh
-bash ./install.sh -d
+sudo systemctl disable --now busylight.service
+sudo systemctl enable --now unicorn-solar.service
 ```
 
-The scripts usage output is as follows:
+Return to Busy Server:
 
-```
-Unicorn Busy Server installation script 0.5
-(c) Jamie Maynard 2020
-
-Usage:
-  -i  --install-dir        Specify where you want to install to
-                           Default is: /home/pi/Development/unicorn-busy-server
-  -d  --development        Install for development only (no service installation)
-  -V  --verbose            Shows command output for debugging
-  -v  --version            Shows version details
-  -h  --help               Shows this usage message
+```bash
+sudo systemctl disable --now unicorn-solar.service
+sudo systemctl enable --now busylight.service
 ```
 
-# Usage
+## Development
 
-If you've run the install script (without the -d option) check the Unicorn hat attache to your Pi.  If all has gone according to plan the unicorn hat will be changing colours.  Once its going through all 360 Hues within the HSV spectrum it'll go blank.  As soon as the Unicorn hat lights up the `Busylight Server` is ready to start receiving commands.
+Create a Python environment and run the server:
 
-The front-end is available via `http://<your-ip>:9000/`.
-
-![Front-end](./assets/frontend.png)
-
-Front-end labels and descriptions can be edited in `frontend/src/content.ts`.
-
-The API is fairly simple though has been extend quite a bit from its orignal implementation.  The Busy server has the following API endpoing:
-
-| Method                                                    | Endpoint                     | Description                                                          |
-|:---------------------------------------------------------:|------------------------------|----------------------------------------------------------------------|
-| [<span style="color: blue">**GET**</span> <span style="color: green">**POST**</span>](#on)           | [`/api/on`](#on)             | Turn the Unicorn Hat on to a random colour                           |
-| [<span style="color: blue">**GET**</span> <span style="color: green">**POST**</span>](#off)          | [`/api/off`](#off)           | Turn the Unicorn Hat off                                             |
-| [<span style="color: blue">**GET**</span>](#status)       | [`/api/status`](#status)     | Get the status of the Unicorn Hat/Pi                                 |
-| [<span style="color: green">**POST**</span>](#rainbow)    | [`/api/rainbow`](#rainbow)   | Set the unicorn to cycle through all 360 hues in the HSV spectrum    |
-| [<span style="color: green">**POST**</span>](#rgb)        | [`/api/switch`](#rgb)        | Set the unicorn to a specific colour using RGB Integer values        |
-| [<span style="color: blue">**GET**</span> <span style="color: green">**POST**</span>](#available)  | [`/api/available`](#available)  | Set the unicorn to the `available` status color. This overwrites the status. Call [`/api/switch`](#reset) to turn off.  |
-| [<span style="color: blue">**GET**</span> <span style="color: green">**POST**</span>](#busy)       | [`/api/busy`](#busy)       | Set the unicorn to the `busy` status color. This overwrites the status. Call [`/api/switch`](#reset) to turn off.  |
-| [<span style="color: blue">**GET**</span> <span style="color: green">**POST**</span>](#away)       | [`/api/away`](#away)       | Set the unicorn to the `away` status color. This overwrites the status. Call [`/api/switch`](#reset) to turn off.  |
-| [<span style="color: blue">**GET**</span> <span style="color: green">**POST**</span>](#out-of-office) | [`/api/out-of-office`](#out-of-office) | Set the unicorn to the `out of office` status color. This overwrites the status. Call [`/api/switch`](#reset) to turn off. |
-| [<span style="color: blue">**GET**</span> <span style="color: green">**POST**</span>](#appear-offline) | [`/api/appear-offline`](#appear-offline) | Set the unicorn to the `appear offline` status color. This overwrites the status. Call [`/api/switch`](#reset) to turn off. |
-| [<span style="color: blue">**GET**</span> <span style="color: green">**POST**</span>](#do-not-disturb) | [`/api/do-not-disturb`](#do-not-disturb) | Set the unicorn to the `do not disturb` status color. This overwrites the status. Call [`/api/switch`](#reset) to turn off. |
-| [<span style="color: blue">**GET**</span> <span style="color: green">**POST**</span>](#reset)      | [`/api/reset`](#reset)      | Resets the status overwrite setting. This way, the [`/api/switch`](#rgb) can be called again. |
-
-## <a id="on"></a> Set the Unicorn to On
-
-| Method                                      | Endpoint  |
-|:-------------------------------------------:|-----------|
-| <span style="color: blue">**GET**</span> <span style="color: green">**POST**</span>    | `/api/on` |
-
-### Description
-
-The simpelest method there is.  It turns the Unicorn Hat on to a random colour.
-
-### Result
-
-Returns `200 OK` and an Empty JSON Object `{}`
-
-## <a id="off"></a> Set the Unicorn to Off
-
-| Method                                      | Endpoint   |
-|:-------------------------------------------:|------------|
-| <span style="color: blue">**GET**</span> <span style="color: green">**POST**</span>    | `/api/off` |
-
-### Description
-
-Another really simple method.  This Turns the Unicorn Hat off.
-
-### Result
-
-Returns `200 OK` and an Empty JSON Object `{}`
-
-## <a id="status"></a> Get the server Status
-
-| Method                                      | Endpoint      |
-|:-------------------------------------------:|---------------|
-| <span style="color: blue">**GET**</span>    | `/api/status` |
-
-### Description
-
-Get the status of the pi
-
-### Result
-
-Returns `200 OK` and the following JSON Object:
-
-```json
-{
-  "blue": 110,
-  "brightness": 0.5,
-  "cpuTemp": 39.546,
-  "green": 60,
-  "height": 8,
-  "icon": "none",
-  "lastCalled": "Sun, 17 May 2020 18:00:33 GMT",
-  "lastCalledApi": "/api/on",
-  "red": 247,
-  "unicorn": "phat",
-  "width": 4
-}
+```bash
+python3 -m venv --system-site-packages .venv
+.venv/bin/pip install flask flask-cors jsmin
+.venv/bin/python server.py
 ```
 
-## <a id="rainbow"></a> Set Unicorn to show a Rainbow
+Without compatible hardware, the wrapper automatically uses a 17x7 dummy
+display. The server and control panel are available at
+`http://localhost:9001/`.
 
-| Method                                       | Endpoint        |
-|:--------------------------------------------:|-----------------|
-| <span style="color: green">**POST**</span>   | `/api/rainbow`  |
+Build the frontend:
 
-### Description
-
-This method was build off the back of an HSV method in the UnicornWrapper class.  You can step horizontally across the HSV spectrum from 0 to 360 this allows you to cycle through all colours of a spectrum.  It is similar to Razer Synpases "Spectrum" effect.  It makes a nice Unicorn when you're not doing anything and can be helpful for making sure your Unicorn Phat/Mini is setup correctly.
-
-### Request
-
-All values are optional in this request so its possible to send a request like the one below and still have the rainbow effect activate.
-
-```json
-{}
+```bash
+cd frontend
+npm install
+npm run build
 ```
 
-However you can customise your rainbow first by specifying the starting `hue`.  This is an integer between `0` and `360`.  The default is `0` which is Red.
+All user-facing frontend labels and descriptions are centralized in
+`frontend/src/content.ts`.
 
-You can specify your `step` through the hue range.  This again can be any number between `1` and `90`  The bigger the number the greater the change between between transitioning colours.  Smaller numbers result in a much smooter transition.  The default is `1`.
+Run the backend tests:
 
-You can specify the transition `speed`, that is the speed at which the colours change.  This is any number in seconds the smaller the number the quicker the change the quicker you cycle through the hue spectrum.  The default is `0.2`
-
-Finally you can specify the `brightness` this is any floating point number between `0` and `1`.  The default is `0.5`.
-
-Example request JSON:
-
-
-```jsonc
-{
-    "brightness": 0.5,      // Optional
-    "speed": 1              // Optional
-}
+```bash
+.venv/bin/python -m unittest -v
 ```
 
-### Result
+## License
 
-Returns `200 OK` and an Empty JSON Object `{}`
-
-## <a id="rgb"></a> Set Unicorn to a colour using RGB
-
-| Method                                       | Endpoint       |
-|:--------------------------------------------:|----------------|
-| <span style="color: green">**POST**</span>   | `/api/switch`  |
-
-### Description
-
-This is the original RGB method for setting the Unicorn to a single colour.
-
-### Request
-
-You have to specify the vaules for `red`, `green` and `blue`.  These are integers between `0` and `255`.
-
-Optionally you can specify the brightness of the Unicorn.  This is a float value between 0 and 1.  The default is set to 0.5.
-
-Optionally you can also specify the blink speed.  This specifies the speed in seconds which the Unicorn turns on and off.
-
-```jsonc
-{
-    "red":0,
-    "green":255,
-    "blue":0,
-    "brightness": 0.5,      // Optional
-    "speed": 1              // Optional
-}
-```
-
-### Result
-
-Returns `200 OK` and an Empty JSON Object `{}`
-
-
-## <a id="available"></a> Set the Unicorn to available
-
-| Method                                      | Endpoint  |
-|:-------------------------------------------:|-----------|
-| <span style="color: blue">**GET**</span> <span style="color: blue">**POST**</span>    | `/api/available` |
-
-### Description
-
-Overrides the status to `available`. This way, any call coming in to the [`/api/switch`](#rgb) endpoint will be ignored. You will have to call the [`/api/reset`](#reset) endpoint in order to remove the override.
-
-### Result
-
-Returns `200 OK` and an Empty JSON Object `{}`
-
-
-## <a id="busy"></a> Set the Unicorn to busy
-
-| Method                                      | Endpoint  |
-|:-------------------------------------------:|-----------|
-| <span style="color: blue">**GET**</span> <span style="color: blue">**POST**</span>    | `/api/busy` |
-
-### Description
-
-Overrides the status to `busy`. This way, any call coming in to the [`/api/switch`](#rgb) endpoint will be ignored. You will have to call the [`/api/reset`](#reset) endpoint in order to remove the override.
-
-### Result
-
-Returns `200 OK` and an Empty JSON Object `{}`
-
-
-## <a id="away"></a> Set the Unicorn to away
-
-| Method                                      | Endpoint  |
-|:-------------------------------------------:|-----------|
-| <span style="color: blue">**GET**</span> <span style="color: blue">**POST**</span>    | `/api/away` |
-
-### Description
-
-Overrides the status to `away`. This way, any call coming in to the [`/api/switch`](#rgb) endpoint will be ignored. You will have to call the [`/api/reset`](#reset) endpoint in order to remove the override.
-
-### Result
-
-Returns `200 OK` and an Empty JSON Object `{}`
-
-
-## <a id="out-of-office"></a> Set the Unicorn to out of office
-
-| Method                                      | Endpoint  |
-|:-------------------------------------------:|-----------|
-| <span style="color: blue">**GET**</span> <span style="color: blue">**POST**</span>    | `/api/out-of-office` |
-
-### Description
-
-Overrides the status to `out of office`. This way, any call coming in to the [`/api/switch`](#rgb) endpoint will be ignored. You will have to call the [`/api/reset`](#reset) endpoint in order to remove the override.
-
-### Result
-
-Returns `200 OK` and an Empty JSON Object `{}`
-
-
-## <a id="appear-offline"></a> Set the Unicorn to appear offline
-
-| Method                                      | Endpoint  |
-|:-------------------------------------------:|-----------|
-| <span style="color: blue">**GET**</span> <span style="color: blue">**POST**</span>    | `/api/appear-offline` |
-
-### Description
-
-Overrides the status to `appear offline`. This way, any call coming in to the [`/api/switch`](#rgb) endpoint will be ignored. You will have to call the [`/api/reset`](#reset) endpoint in order to remove the override.
-
-### Result
-
-Returns `200 OK` and an Empty JSON Object `{}`
-
-
-## <a id="do-not-disturb"></a> Set the Unicorn to do not disturb
-
-| Method                                      | Endpoint  |
-|:-------------------------------------------:|-----------|
-| <span style="color: blue">**GET**</span> <span style="color: blue">**POST**</span>    | `/api/do-not-disturb` |
-
-### Description
-
-Overrides the status to `do not disturb`. This way, any call coming in to the [`/api/switch`](#rgb) endpoint will be ignored. You will have to call the [`/api/reset`](#reset) endpoint in order to remove the override.
-
-### Result
-
-Returns `200 OK` and an Empty JSON Object `{}`
-
-
-## <a id="reset"></a> Set the Unicorn to reset
-
-| Method                                      | Endpoint  |
-|:-------------------------------------------:|-----------|
-| <span style="color: blue">**GET**</span> <span style="color: blue">**POST**</span>    | `/api/reset` |
-
-### Description
-
-Resets the status override state so that the [`/api/switch`](#rgb) endpoint will not ignore color/status changes.
-
-### Result
-
-Returns `200 OK` and an Empty JSON Object `{}`
-
-
-# License
-
-**MIT License**
-
-Copyright (c) 2020 [*Elio Struyf*](https://github.com/estruyf)
-Parts (c) 2020 [*Jamie Maynard*](https://github.com/j-maynard)
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+Licensed under the MIT License. See [LICENSE](./LICENSE).

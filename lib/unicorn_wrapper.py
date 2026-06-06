@@ -46,13 +46,14 @@ class UnicornWrapper:
             self.hat = UnicornHATMini()
             self.type = hat
             self.hat.set_brightness(0.5)
-            self.hat.set_rotation(90)
+            self.hat.set_rotation(0)
         elif hat == 'dummy':
             self.hat = None
             self.type = 'none'
             self.brightness = 0.5
             self.rotation = 0
-            self.width, self.height = (8, 4)
+            self.width, self.height = (17, 7)
+            self.pixels = [[(0, 0, 0) for _ in range(self.height)] for _ in range(self.width)]
             return
         else:
             if unicornhat is None:
@@ -61,7 +62,7 @@ class UnicornWrapper:
             self.type = hat
             self.hat.set_layout(unicornhat.PHAT)
             self.hat.brightness(0.5)
-            self.hat.rotation(90)
+            self.hat.rotation(0)
         self.brightness = 0.5
         self.rotation = 0
         self.width, self.height = self.hat.get_shape()
@@ -74,6 +75,7 @@ class UnicornWrapper:
 
     def clear(self):
         if self.hat is None:
+            self.pixels = [[(0, 0, 0) for _ in range(self.height)] for _ in range(self.width)]
             return None
         return self.hat.clear()
 
@@ -105,6 +107,7 @@ class UnicornWrapper:
     
     def setPixel(self, x, y, r, g, b):
         if self.hat is None:
+            self.pixels[x][y] = (r, g, b)
             return None
         self.hat.set_pixel(x, y, r, g, b)
     

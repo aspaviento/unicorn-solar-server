@@ -1,11 +1,18 @@
-# Install the required dependencies
-sudo apt-get install -y python3-pip python3-dev
-sudo pip3 install -r ./requirements.txt
+#!/bin/bash
 
-# Create the service
-sudo cp busylight.service /etc/systemd/system/busylight.service
-sudo systemctl enable busylight.service
-sudo systemctl start busylight.service
+set -e
 
-# Change permissions of the start up script
-sudo chmod +x ./start.sh
+INSTALL_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+sudo apt-get install -y python3-pip python3-dev python3-venv
+python3 -m venv --system-site-packages "$INSTALL_DIR/.venv"
+"$INSTALL_DIR/.venv/bin/pip" install -r "$INSTALL_DIR/requirements.txt"
+
+sudo cp "$INSTALL_DIR/unicorn-solar.service" /etc/systemd/system/unicorn-solar.service
+sudo systemctl daemon-reload
+if systemctl list-unit-files busylight.service > /dev/null 2>&1; then
+    sudo systemctl disable --now busylight.service
+fi
+sudo systemctl enable --now unicorn-solar.service
+
+sudo chmod +x "$INSTALL_DIR/start.sh"

@@ -25,24 +25,30 @@ usage() {
 }
 
 version() {
-    echo -e "${BOLD}Unicorn Busy Server installation script 0.5${NORMAL}"
-    echo -e "(c) Jamie Maynard 2020"
+    echo -e "${BOLD}Unicorn Solar Server installation script 0.1${NORMAL}"
 }
 
 installSystemdService() {
     show_msg "${GREEN}Installing Systemd Service...${NORMAL}"
-    sed -i "s+WorkingDirectory=/home/pi/unicorn-busy-server+WorkingDirectory=$INSTALL_DIR+g" $INSTALL_DIR/busylight.service
-    if [[ ! -f /etc/systemd/system/busylight.service ]]; then
-        sudo cp busylight.service /etc/systemd/system/busylight.service
-    else
-        sudo sed -i "s+WorkingDirectory=/home/pi/unicorn-busy-server+WorkingDirectory=$INSTALL_DIR+g" /etc/systemd/system/busylight.service
-    fi
+    sed -i "s+WorkingDirectory=/home/pi/unicorn-solar-server+WorkingDirectory=$INSTALL_DIR+g" $INSTALL_DIR/unicorn-solar.service
+    sed -i "s+ExecStart=/home/pi/unicorn-solar-server/.venv/bin/python server.py+ExecStart=$INSTALL_DIR/.venv/bin/python server.py+g" $INSTALL_DIR/unicorn-solar.service
+    sudo cp $INSTALL_DIR/unicorn-solar.service /etc/systemd/system/unicorn-solar.service
+    sudo systemctl daemon-reload
+}
+
+installPythonEnvironment() {
+    show_msg "${GREEN}Installing Python environment...${NORMAL}"
+    python3 -m venv --system-site-packages $INSTALL_DIR/.venv
+    $INSTALL_DIR/.venv/bin/pip install -r $INSTALL_DIR/requirements.txt
 }
 
 enableSystemdService() {
     show_msg "${GREEN}Starting Systemd Service...${NORMAL}"
-    sudo systemctl enable busylight.service
-    sudo systemctl start busylight.service
+    if systemctl list-unit-files busylight.service > /dev/null 2>&1; then
+        sudo systemctl disable --now busylight.service
+    fi
+    sudo systemctl enable unicorn-solar.service
+    sudo systemctl start unicorn-solar.service
 }
 
 VERBOSE=false
@@ -77,7 +83,7 @@ if [ $VERBOSE == "false" ]; then
 fi
 
 # Check if we have the required files or if we need to clone them
-FILES=("server.py" "requirements.txt" "start.sh" "busylight.service" "lib/__init__.py" "lib/unicorn_wrapper.py")
+FILES=("server.py" "requirements.txt" "start.sh" "unicorn-solar.service" "lib/__init__.py" "lib/unicorn_wrapper.py")
 FILECHECK=true
 for FILE in ${FILES[@]}; do
     if [ $INSTALL_DIR != $SCRIPTPATH ]; then
@@ -108,28 +114,27 @@ if [ $FILECHECK == 'false' ]; then
         exit 1
     fi
     if [ "$(ls -A ${INSTALL_DIR})" ]; then
-        INSTALL_DIR="$INSTALL_DIR/unicorn-busy-server"
+        INSTALL_DIR="$INSTALL_DIR/unicorn-solar-server"
     fi
     show_msg "${GREEN}Cloning files from git using HTTPS to ${BOLD}${INSTALL_DIR}${NORMAL}${GREEN}...${NORMAL}"
-    git clone -q https://github.com/aspaviento/unicorn-busy-server.git $INSTALL_DIR
+    git clone -q https://github.com/aspaviento/unicorn-solar-server.git $INSTALL_DIR
     chown -R $SUDO_USER:$SUDO_USER $INSTALL_DIR
     cd $INSTALL_DIR
 fi
 
 case $(uname -s) in
     Linux|GNU*)     case $(lsb_release -si) in
-                        Ubuntu | Raspbian)      show_msg "${GREEN}Installing required files from apt...${NORMAL}"
-                                                sudo apt-get install -y python3-pip python3-dev
-                                                if [[ $DEVELOPMENT == "false" ]]; then
-                                                    installSystemdService
-                                                    enableSystemdService
-                                                fi
+                        Ubuntu | Debian | Raspbian) show_msg "${GREEN}Installing required files from apt...${NORMAL}"
+                                                sudo apt-get install -y python3-pip python3-dev python3-venv
                                                 ;;
                         *)                      show_msg "${RED}${BOLD}Unsupported distribution, please consider submitting a pull request to extend the script${NORMAL}"
                                                 exit 1
                     esac
-                    show_msg "${GREEN}Installing needed files from pip...${NORMAL}"
-                    sudo pip3 install -r ./requirements.txt
+                    installPythonEnvironment
+                    if [[ $DEVELOPMENT == "false" ]]; then
+                        installSystemdService
+                        enableSystemdService
+                    fi
                     ;;
     *)              show_msg "${RED}${BOLD}Unsupported operating system, please consider submitting a pull request to extend the script${NORMAL}"
                     exit 1

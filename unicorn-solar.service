@@ -1,0 +1,15 @@
+[Unit]
+Description=Unicorn Solar Server
+After=network.target busylight.service
+Conflicts=busylight.service
+
+[Service]
+User=root
+WorkingDirectory=/home/pi/unicorn-solar-server
+ExecStart=/home/pi/unicorn-solar-server/.venv/bin/python server.py
+Restart=always
+Environment=FLASK_CONFIG=production
+Environment=UNICORN_SOLAR_PORT=9001
+
+[Install]
+WantedBy=multi-user.target

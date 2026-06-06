@@ -1,425 +1,171 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import json
-
 import os
 import threading
-import math
-from time import sleep
-from time import monotonic
-from datetime import datetime
-from gpiozero import CPUTemperature
-from lib.unicorn_wrapper import UnicornWrapper
+from datetime import datetime, timezone
+
 from flask import Flask, jsonify, make_response, request, send_from_directory
 from flask_cors import CORS
-from random import randint
 from jsmin import jsmin
 
-blinkThread = None
-hardwareLock = threading.RLock()
-crntColors = None
-globalRed = 0
-globalGreen = 0
-globalBlue = 0
-globalBrightness = 0
-globalLastCalled = None
-globalLastCalledApi = None
-globalStatus = None
-globalStatusOverwrite = False
+from lib.unicorn_wrapper import UnicornWrapper
 
-# Initialize the Unicorn hat
+FLOW_COLORS = {
+    'charging': (0, 180, 80),
+    'discharging': (230, 55, 60),
+    'exporting': (30, 120, 255),
+}
+TARIFF_COLORS = {
+    'low': (0, 180, 80),
+    'medium': (255, 190, 0),
+    'high': (230, 55, 60),
+}
+WHITE = (245, 248, 252)
+BAR_START_COLUMNS = (14, 11, 8, 5, 2)
+DISPLAY_WIDTH = 17
+DISPLAY_HEIGHT = 7
+DEFAULT_PORT = 9001
+
+hardware_lock = threading.RLock()
 unicorn = UnicornWrapper()
-
-# get the width and height of the hardware and set it to portrait if its not
 width, height = unicorn.getShape()
+if (width, height) != (DISPLAY_WIDTH, DISPLAY_HEIGHT):
+    raise RuntimeError(
+        f'Unicorn Solar Server requires a 17x7 display, got {width}x{height}. '
+        'Use a Unicorn HAT Mini at rotation 0.'
+    )
+state = {
+    'percentage': 0,
+    'flow': 'charging',
+    'tariff': 'medium',
+    'lastCalled': None,
+    'lastCalledApi': None,
+}
 
 
-class MyFlaskApp(Flask):
-	def run(self, host=None, port=None, debug=None, load_dotenv=True, **options):
-		if not self.debug or os.getenv('WERKZEUG_RUN_MAIN') == 'true':
-			with self.app_context():
-				startupRainbow()
-		super(MyFlaskApp, self).run(host=host, port=port, debug=debug, load_dotenv=load_dotenv, **options)
+class SolarFlaskApp(Flask):
+    def run(self, host=None, port=None, debug=None, load_dotenv=True, **options):
+        if not self.debug or os.getenv('WERKZEUG_RUN_MAIN') == 'true':
+            with self.app_context():
+                render_display()
+        super().run(host=host, port=port, debug=debug, load_dotenv=load_dotenv, **options)
 
 
-app = MyFlaskApp(__name__, static_folder='frontend/build', static_url_path='/')
-cors = CORS(app, resources={r"/api/*": {"origins": "*"}})
+app = SolarFlaskApp(__name__, static_folder='frontend/build', static_url_path='/')
+CORS(app, resources={r'/api/*': {'origins': '*'}})
 
 
-def setColor(r, g, b, brightness=0.5, speed=None):
-	global crntColors
-	setPixels(r, g, b, brightness)
-	with hardwareLock:
-		unicorn.show()
-
-	if speed is not None and speed != '':
-		crntT = threading.current_thread()
-		with hardwareLock:
-			unicorn.clear()
-		while getattr(crntT, "do_run", True):
-			setPixels(r, g, b, brightness)
-			with hardwareLock:
-				unicorn.show()
-			sleepWhileRunning(crntT, speed)
-			with hardwareLock:
-				unicorn.clear()
-				unicorn.show()
-			sleepWhileRunning(crntT, speed)
+def read_json_body():
+    raw = request.get_data(as_text=True) or '{}'
+    try:
+        content = json.loads(jsmin(raw))
+    except ValueError:
+        return None, make_response(jsonify({'error': 'Invalid JSON body'}), 400)
+    if not isinstance(content, dict):
+        return None, make_response(jsonify({'error': 'JSON body must be an object'}), 400)
+    return content, None
 
 
-def sleepWhileRunning(thread, seconds):
-	end = monotonic() + seconds
-	while getattr(thread, "do_run", True):
-		remaining = end - monotonic()
-		if remaining <= 0:
-			return
-		sleep(min(0.1, remaining))
+def validate_choice(content, field, choices):
+    value = content.get(field)
+    if value not in choices:
+        return None, f'{field} must be one of: {", ".join(choices)}'
+    return value, None
 
 
-def setPixels(r, g, b, brightness=0.5):
-	global globalBrightness, globalBlue, globalGreen, globalRed
-
-	globalRed = r
-	globalGreen = g
-	globalBlue = b
-
-	if brightness is not None:
-		globalBrightness = brightness
-		with hardwareLock:
-			unicorn.setBrightness(brightness)
-
-	with hardwareLock:
-		unicorn.setColour(r, g, b)
+def set_pixel(x, y, color):
+    if 0 <= x < width and 0 <= y < height:
+        unicorn.setPixel(x, y, *color)
 
 
-def startAnimation(target, args):
-	global blinkThread
-	switchOff()
-	blinkThread = threading.Thread(target=target, args=args, daemon=True)
-	blinkThread.do_run = True
-	blinkThread.start()
+def render_display():
+    """Render the solar state as a horizontal battery on a 17x7 matrix."""
+    active_bars = min(5, max(0, int((state['percentage'] + 19) // 20)))
+    with hardware_lock:
+        unicorn.clear()
+        unicorn.setBrightness(0.5)
+        for x in range(1, DISPLAY_WIDTH):
+            set_pixel(x, 0, WHITE)
+            set_pixel(x, 6, WHITE)
+        for y in range(1, 6):
+            set_pixel(1, y, WHITE)
+            set_pixel(16, y, WHITE)
+        for start_x in BAR_START_COLUMNS[:active_bars]:
+            for x in (start_x, start_x + 1):
+                for y in range(1, 6):
+                    set_pixel(x, y, FLOW_COLORS[state['flow']])
+        for y in (2, 3, 4):
+            set_pixel(0, y, TARIFF_COLORS[state['tariff']])
+        unicorn.show()
 
 
-def readJsonBody():
-	raw = request.get_data(as_text=True) or '{}'
-	try:
-		content = json.loads(jsmin(raw))
-	except ValueError:
-		return None, make_response(jsonify({'error': 'Invalid JSON body'}), 400)
-
-	if not isinstance(content, dict):
-		return None, make_response(jsonify({'error': 'JSON body must be an object'}), 400)
-
-	return content, None
+def touch(endpoint):
+    state['lastCalledApi'] = endpoint
+    state['lastCalled'] = datetime.now(timezone.utc).isoformat()
 
 
-def getNumber(content, field, minimum, maximum, required=False):
-	value = content.get(field, None)
-	if value is None:
-		if required:
-			return None, f'{field} must be present'
-		return None, None
-
-	if isinstance(value, bool) or not isinstance(value, (int, float)):
-		return None, f'{field} must be a number'
-
-	if value < minimum or value > maximum:
-		return None, f'{field} must be between {minimum} and {maximum}'
-
-	return value, None
+def status_payload():
+    return {
+        **state,
+        'activeBars': min(5, max(0, int((state['percentage'] + 19) // 20))),
+        'height': height,
+        'rotation': unicorn.getRotation(),
+        'width': width,
+        'unicorn': unicorn.getType(),
+    }
 
 
-def switchOn():
-	rgb = unicorn.hsvIntToRGB(randint(0, 360), 100, 100)
-	startAnimation(setColor, (rgb[0], rgb[1], rgb[2]))
-
-
-def switchOff():
-	global blinkThread, globalBlue, globalGreen, globalRed
-	globalRed = 0
-	globalGreen = 0
-	globalBlue = 0
-	if blinkThread is not None:
-		blinkThread.do_run = False
-		if blinkThread != threading.current_thread():
-			blinkThread.join(timeout=1)
-		blinkThread = None
-	with hardwareLock:
-		unicorn.clear()
-		unicorn.off()
-
-
-def halfBlink():
-	with hardwareLock:
-		unicorn.show()
-	sleep(0.8)
-	with hardwareLock:
-		unicorn.clear()
-		unicorn.show()
-	sleep(0.2)
-
-
-def countDown(time):
-	showTime = time - 12
-	brightness = 0.5
-	while showTime > 0:
-		b = brightness
-		for x in range(4):
-			b = b - x
-			setPixels(255, 255, 0, b)
-			with hardwareLock:
-				unicorn.show()
-			sleep(0.5)
-			with hardwareLock:
-				unicorn.clear()
-		with hardwareLock:
-			unicorn.show()
-		sleep(2)
-		showTime = showTime - 2
-	for i in range(10):
-		setPixels(255, 0, 0, 0.5)
-		halfBlink()
-	setColor(255, 0, 0, 0.5)
-	halfBlink()
-	with hardwareLock:
-		unicorn.clear()
-		unicorn.off()
-
-
-def displayRainbow(brightness, speed, run=None):
-	global crntColors
-	if speed is None:
-		speed = 0.01
-	if brightness is None:
-		brightness = 0.5
-	crntT = threading.current_thread()
-	i = 0.0
-	offset = 30
-	while getattr(crntT, "do_run", True):
-		i = i + 0.3
-		with hardwareLock:
-			unicorn.setBrightness(brightness)
-			for x in range(0, width):
-				for y in range(0, height):
-					r = (math.cos((x + i) / 2.0) + math.cos((y + i) / 2.0)) * 64.0 + 128.0
-					g = (math.sin((x + i) / 1.5) + math.sin((y + i) / 2.0)) * 64.0 + 128.0
-					b = (math.sin((x + i) / 2.0) + math.cos((y + i) / 1.5)) * 64.0 + 128.0
-					r = max(0, min(255, r + offset))
-					g = max(0, min(255, g + offset))
-					b = max(0, min(255, b + offset))
-					unicorn.setPixel(x, y, int(r), int(g), int(b))
-
-			unicorn.show()
-		sleepWhileRunning(crntT, speed)
-
-
-def setTimestamp():
-	global globalLastCalled
-	globalLastCalled = datetime.now()
-
-
-# API Initialization
 @app.route('/', methods=['GET'])
 def root():
-	print(app.static_folder)
-	return send_from_directory(app.static_folder, 'index.html')
+    return send_from_directory(app.static_folder, 'index.html')
 
 
-@app.route('/api/on', methods=['GET', 'POST'])
-def apiOn():
-	global globalStatusOverwrite, globalStatus, globalLastCalledApi
-	globalStatusOverwrite = False
-	globalStatus = 'on'
-	globalLastCalledApi = '/api/on'
-	switchOff()
-	switchOn()
-	setTimestamp()
-	return make_response(jsonify({}))
+@app.route('/api/battery', methods=['POST'])
+def api_battery():
+    content, error_response = read_json_body()
+    if error_response is not None:
+        return error_response
+    percentage = content.get('percentage')
+    if isinstance(percentage, bool) or not isinstance(percentage, (int, float)):
+        return make_response(jsonify({'error': 'percentage must be a number'}), 400)
+    if percentage < 0 or percentage > 100:
+        return make_response(jsonify({'error': 'percentage must be between 0 and 100'}), 400)
+    flow, error = validate_choice(content, 'flow', FLOW_COLORS)
+    if error:
+        return make_response(jsonify({'error': error}), 400)
+    if flow == 'exporting' and percentage != 100:
+        return make_response(jsonify({'error': 'exporting requires percentage to be 100'}), 400)
+    state['percentage'] = percentage
+    state['flow'] = flow
+    touch('/api/battery')
+    render_display()
+    return jsonify(status_payload())
 
 
-@app.route('/api/off', methods=['GET', 'POST'])
-def apiOff():
-	global crntColors, globalStatusOverwrite, globalStatus, globalLastCalledApi
-	globalStatusOverwrite = False
-	globalStatus = 'off'
-	globalLastCalledApi = '/api/off'
-	crntColors = None
-	switchOff()
-	setTimestamp()
-	return make_response(jsonify({}))
-
-
-@app.route('/api/switch', methods=['POST'])
-def apiSwitch():
-	global blinkThread, globalStatusOverwrite, globalStatus, globalLastCalledApi
-
-	if globalStatusOverwrite:
-		return make_response(jsonify({}))
-
-	globalLastCalledApi = '/api/switch'
-	content, error = readJsonBody()
-	if error is not None:
-		return error
-
-	red, error = getNumber(content, 'red', 0, 255, True)
-	if error is not None:
-		return make_response(jsonify({'error': error}), 400)
-	green, error = getNumber(content, 'green', 0, 255, True)
-	if error is not None:
-		return make_response(jsonify({'error': error}), 400)
-	blue, error = getNumber(content, 'blue', 0, 255, True)
-	if error is not None:
-		return make_response(jsonify({'error': error}), 400)
-
-	if red == 0 and green == 144 and blue == 0:
-		globalStatus = 'Available'
-	elif red == 255 and green == 191 and blue == 0:
-		globalStatus = 'Away'
-	elif red == 179 and green == 0 and blue == 0:
-		globalStatus = 'Busy'
-	elif red == 0 and green == 86 and blue == 179:
-		globalStatus = 'Out of office'
-	elif red == 128 and green == 128 and blue == 128:
-		globalStatus = 'Appear Offline'
-	elif red == 128 and green == 0 and blue == 128:
-		globalStatus = 'Do not Disturb'
-	else:
-		globalStatus = None
-
-	brightness, error = getNumber(content, 'brightness', 0, 1)
-	if error is not None:
-		return make_response(jsonify({'error': error}), 400)
-	speed, error = getNumber(content, 'speed', 0.01, 60)
-	if error is not None:
-		return make_response(jsonify({'error': error}), 400)
-
-	startAnimation(setColor, (int(red), int(green), int(blue), brightness, speed))
-	setTimestamp()
-	return make_response(jsonify())
-
-@app.route('/api/available', methods=['GET', 'POST'])
-def availableCall():
-	global globalStatusOverwrite, globalStatus, globalLastCalledApi, blinkThread
-	globalStatusOverwrite = True
-	globalStatus = 'Available'
-	globalLastCalledApi = '/api/available'
-	startAnimation(setColor, (0, 144, 0))
-	setTimestamp()
-	return make_response(jsonify())
-
-@app.route('/api/busy', methods=['GET', 'POST'])
-def busyCall():
-	global globalStatusOverwrite, globalStatus, globalLastCalledApi, blinkThread
-	globalStatusOverwrite = True
-	globalStatus = 'Busy'
-	globalLastCalledApi = '/api/busy'
-	startAnimation(setColor, (179, 0, 0))
-	setTimestamp()
-	return make_response(jsonify())
-
-@app.route('/api/away', methods=['GET', 'POST'])
-def awayCall():
-	global globalStatusOverwrite, globalStatus, globalLastCalledApi, blinkThread
-	globalStatusOverwrite = True
-	globalStatus = 'Away'
-	globalLastCalledApi = '/api/away'
-	startAnimation(setColor, (255, 191, 0))
-	setTimestamp()
-	return make_response(jsonify())
-
-@app.route('/api/out-of-office', methods=['GET', 'POST'])
-def outOfOfficeCall():
-	global globalStatusOverwrite, globalStatus, globalLastCalledApi, blinkThread
-	globalStatusOverwrite = True
-	globalStatus = 'Out of office'
-	globalLastCalledApi = '/api/out-of-office'
-	startAnimation(setColor, (0, 86, 179))
-	setTimestamp()
-	return make_response(jsonify())
-
-@app.route('/api/appear-offline', methods=['GET', 'POST'])
-def appearOfflineCall():
-	global globalStatusOverwrite, globalStatus, globalLastCalledApi, blinkThread
-	globalStatusOverwrite = True
-	globalStatus = 'Appear Offline'
-	globalLastCalledApi = '/api/appear-offline'
-	startAnimation(setColor, (128, 128, 128))
-	setTimestamp()
-	return make_response(jsonify())
-
-@app.route('/api/do-not-disturb', methods=['GET', 'POST'])
-def doNotDisturbCall():
-	global globalStatusOverwrite, globalStatus, globalLastCalledApi, blinkThread
-	globalStatusOverwrite = True
-	globalStatus = 'Do not Disturb'
-	globalLastCalledApi = '/api/do-not-disturb'
-	startAnimation(setColor, (128, 0, 128))
-	setTimestamp()
-	return make_response(jsonify())
-
-@app.route('/api/reset', methods=['GET', 'POST'])
-def resetCall():
-	global globalStatusOverwrite, globalStatus, globalLastCalledApi, blinkThread
-	globalStatusOverwrite = False
-	return make_response(jsonify())
-
-
-@app.route('/api/rainbow', methods=['POST'])
-def apiDisplayRainbow():
-	global blinkThread, globalStatus, globalLastCalledApi
-	globalStatus = 'rainbow'
-	globalLastCalledApi = '/api/rainbow'
-	content, error = readJsonBody()
-	if error is not None:
-		return error
-
-	brightness, error = getNumber(content, 'brightness', 0, 1)
-	if error is not None:
-		return make_response(jsonify({'error': error}), 400)
-	speed, error = getNumber(content, 'speed', 0.01, 60)
-	if error is not None:
-		return make_response(jsonify({'error': error}), 400)
-
-	startAnimation(displayRainbow, (brightness, speed, None))
-	setTimestamp()
-	return make_response(jsonify())
+@app.route('/api/tariff', methods=['POST'])
+def api_tariff():
+    content, error_response = read_json_body()
+    if error_response is not None:
+        return error_response
+    level, error = validate_choice(content, 'level', TARIFF_COLORS)
+    if error:
+        return make_response(jsonify({'error': error}), 400)
+    state['tariff'] = level
+    touch('/api/tariff')
+    render_display()
+    return jsonify(status_payload())
 
 
 @app.route('/api/status', methods=['GET'])
-def apiStatus():
-	global globalStatusOverwrite, globalStatus, globalBlue, globalGreen, globalRed, globalBrightness, \
-		globalLastCalled, globalLastCalledApi, width, height, unicorn
-
-	try:
-		cpuTemp = CPUTemperature().temperature
-	except Exception:
-		cpuTemp = None
-
-	return jsonify({
-		'red': globalRed, 
-		'green': globalGreen,
-		'blue': globalBlue,
-		'brightness': globalBrightness,
-		'lastCalled': globalLastCalled,
-		'cpuTemp': cpuTemp,
-		'lastCalledApi': globalLastCalledApi, 
-		'height': height,
-		'width': width,
-		'unicorn': unicorn.getType(),
-		'status': globalStatus,
-		'statusOverwritten': globalStatusOverwrite
-	})
+def api_status():
+    return jsonify(status_payload())
 
 
 @app.errorhandler(404)
-def not_found(error):
-	return make_response(jsonify({'error': 'Not found'}), 404)
-
-
-def startupRainbow():
-	global blinkThread
-	startAnimation(displayRainbow, (1, 0.1, 1))
+def not_found(_error):
+    return make_response(jsonify({'error': 'Not found'}), 404)
 
 
 if __name__ == '__main__':
-	app.run(host='0.0.0.0', port=9000, debug=False)
+    app.run(host='0.0.0.0', port=int(os.getenv('UNICORN_SOLAR_PORT', DEFAULT_PORT)), debug=False)
