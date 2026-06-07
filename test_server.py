@@ -1,16 +1,50 @@
 import unittest
+from copy import deepcopy
 from unittest.mock import patch
 from pathlib import Path
 
 import server
 from lib import unicorn_wrapper
 
+SOLAREDGE_CHARGING = {
+    'siteCurrentPowerFlow': {
+        'connections': [
+            {'from': 'PV', 'to': 'Storage'},
+            {'from': 'PV', 'to': 'Load'},
+            {'from': 'LOAD', 'to': 'Grid'},
+        ],
+        'GRID': {'status': 'Active', 'currentPower': 0.2},
+        'LOAD': {'status': 'Active', 'currentPower': 0.54},
+        'PV': {'status': 'Active', 'currentPower': 3.71},
+        'STORAGE': {'status': 'Charging', 'currentPower': 2.97, 'chargeLevel': 48, 'critical': False},
+    }
+}
+
+SOLAREDGE_EXPORTING = {
+    'siteCurrentPowerFlow': {
+        'connections': [
+            {'from': 'PV', 'to': 'Load'},
+            {'from': 'LOAD', 'to': 'Grid'},
+        ],
+        'GRID': {'status': 'Active', 'currentPower': 3.59},
+        'LOAD': {'status': 'Active', 'currentPower': 0.41},
+        'PV': {'status': 'Active', 'currentPower': 4.0},
+        'STORAGE': {'status': 'Idle', 'currentPower': 0.0, 'chargeLevel': 99, 'critical': False},
+    }
+}
+
 
 class SolarServerTest(unittest.TestCase):
     def setUp(self):
         self.client = server.app.test_client()
         server.stop_animation()
-        server.state.update({'percentage': 0, 'flow': 'charging', 'tariff': 'medium', 'displayMode': 'solar'})
+        server.state.update({
+            'percentage': 0,
+            'flow': 'charging',
+            'barColor': 'green',
+            'tariff': 'medium',
+            'displayMode': 'solar',
+        })
         server.render_solar_display()
 
     def tearDown(self):
@@ -92,6 +126,60 @@ class SolarServerTest(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json['endpoints']['off']['path'], '/api/off')
         self.assertEqual(response.json['endpoints']['rainbow']['path'], '/api/rainbow')
+        self.assertEqual(
+            response.json['endpoints']['solaredgeInterface']['path'],
+            '/api/solaredge-interface',
+        )
+
+    def test_solaredge_charging_uses_charge_level_and_jq_color_algorithm(self):
+        response = self.client.post('/api/solaredge-interface', json=SOLAREDGE_CHARGING)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json['percentage'], 48)
+        self.assertEqual(response.json['activeBars'], 3)
+        self.assertEqual(response.json['flow'], 'charging')
+        self.assertEqual(response.json['barColor'], 'yellow')
+        self.assertEqual(server.unicorn.pixels[14][1], server.BAR_COLORS['yellow'])
+
+    def test_solaredge_idle_exporting_can_be_blue_below_100_percent(self):
+        response = self.client.post('/api/solaredge-interface', json=SOLAREDGE_EXPORTING)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json['percentage'], 99)
+        self.assertEqual(response.json['activeBars'], 5)
+        self.assertEqual(response.json['flow'], 'exporting')
+        self.assertEqual(response.json['barColor'], 'blue')
+        self.assertEqual(server.unicorn.pixels[14][1], server.BAR_COLORS['blue'])
+
+    def test_solaredge_grid_or_storage_source_is_red(self):
+        payload = {
+            **SOLAREDGE_EXPORTING,
+            'siteCurrentPowerFlow': {
+                **SOLAREDGE_EXPORTING['siteCurrentPowerFlow'],
+                'connections': [{'from': 'GRID', 'to': 'Load'}],
+            },
+        }
+        response = self.client.post('/api/solaredge-interface', json=payload)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json['flow'], 'discharging')
+        self.assertEqual(response.json['barColor'], 'red')
+
+    def test_solaredge_grid_power_uses_documented_color_thresholds(self):
+        for grid_power, expected_color in (
+            (1.0, 'yellow'),
+            (1.01, 'green'),
+            (2.0, 'green'),
+            (2.01, 'blue'),
+        ):
+            with self.subTest(grid_power=grid_power):
+                payload = deepcopy(SOLAREDGE_EXPORTING)
+                payload['siteCurrentPowerFlow']['GRID']['currentPower'] = grid_power
+                response = self.client.post('/api/solaredge-interface', json=payload)
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.json['barColor'], expected_color)
+
+    def test_solaredge_rejects_incomplete_payload(self):
+        response = self.client.post('/api/solaredge-interface', json={})
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json['error'], 'siteCurrentPowerFlow.must be an object')
 
     def test_off_turns_off_every_pixel(self):
         self.post_battery(100, 'charging')

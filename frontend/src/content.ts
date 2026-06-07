@@ -15,6 +15,15 @@ export const content = {
     displaySection: 'Display controls',
     rainbow: 'Rainbow',
     off: 'Off',
+    solaredgeSection: 'SolarEdge Interface JSON',
+    solaredgeDescription: 'Paste the JSON output from solaredge-interface site_current_power_flow and send it to the display.',
+    solaredgeLabel: 'SolarEdge current power flow JSON',
+    solaredgePlaceholder: '{"siteCurrentPowerFlow": {...}}',
+    solaredgeSubmit: 'Apply SolarEdge JSON',
+    solaredgeApplying: 'Applying...',
+    solaredgeSuccess: 'SolarEdge JSON applied successfully.',
+    solaredgeInvalidJson: 'Enter valid JSON before applying it.',
+    apiError: (message: string) => `API error: ${message}`,
     flows: {
       charging: 'Charging',
       discharging: 'Discharging',
@@ -45,6 +54,12 @@ export const content = {
         endpoint: '/api/battery',
         request: '{"percentage": 65, "flow": "charging"}',
         description: 'Updates battery percentage and energy flow. Flow accepts charging, discharging, or exporting. Exporting requires 100%.',
+      },
+      {
+        methods: ['POST'],
+        endpoint: '/api/solaredge-interface',
+        request: 'Output from: solaredge-interface --format json site_current_power_flow <siteid>',
+        description: 'Updates the battery display from SolarEdge current power flow data and derives the bar color from its connections and grid power.',
       },
       {
         methods: ['POST'],

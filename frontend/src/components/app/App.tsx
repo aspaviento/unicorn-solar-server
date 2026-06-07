@@ -3,18 +3,21 @@ import './App.css';
 import { content } from '../../content';
 
 type Flow = 'charging' | 'discharging' | 'exporting';
+type BarColor = 'blue' | 'green' | 'red' | 'yellow';
 type Tariff = 'low' | 'medium' | 'high';
 type SolarStatus = {
   percentage: number;
   activeBars: number;
   flow: Flow;
+  barColor: BarColor;
   tariff: Tariff;
 };
 
-const flowColors: Record<Flow, string> = {
-  charging: 'rgb(0, 180, 80)',
-  discharging: 'rgb(230, 55, 60)',
-  exporting: 'rgb(30, 120, 255)',
+const barColors: Record<BarColor, string> = {
+  blue: 'rgb(30, 120, 255)',
+  green: 'rgb(0, 180, 80)',
+  red: 'rgb(230, 55, 60)',
+  yellow: 'rgb(255, 190, 0)',
 };
 const tariffColors: Record<Tariff, string> = {
   low: 'rgb(0, 180, 80)',
@@ -22,13 +25,30 @@ const tariffColors: Record<Tariff, string> = {
   high: 'rgb(230, 55, 60)',
 };
 const barStartColumns = [14, 11, 8, 5, 2];
+const solaredgeExample = `{
+  "siteCurrentPowerFlow": {
+    "connections": [
+      { "from": "PV", "to": "Load" },
+      { "from": "LOAD", "to": "Grid" }
+    ],
+    "GRID": { "status": "Active", "currentPower": 3.59 },
+    "LOAD": { "status": "Active", "currentPower": 0.41 },
+    "PV": { "status": "Active", "currentPower": 4.0 },
+    "STORAGE": {
+      "status": "Idle",
+      "currentPower": 0.0,
+      "chargeLevel": 99,
+      "critical": false
+    }
+  }
+}`;
 
 function pixelColor(status: SolarStatus, x: number, y: number) {
   if (x === 0 && [2, 3, 4].includes(y)) return tariffColors[status.tariff];
   if ((y === 0 || y === 6) && x >= 1) return 'rgb(245, 248, 252)';
   if ((x === 1 || x === 16) && y >= 1 && y <= 5) return 'rgb(245, 248, 252)';
   for (const start of barStartColumns.slice(0, status.activeBars)) {
-    if ((x === start || x === start + 1) && y >= 1 && y <= 5) return flowColors[status.flow];
+    if ((x === start || x === start + 1) && y >= 1 && y <= 5) return barColors[status.barColor];
   }
   return null;
 }
@@ -82,8 +102,18 @@ const ApiDocs: React.FunctionComponent = () => (
 );
 
 export function App() {
-  const [status, setStatus] = React.useState<SolarStatus>({ percentage: 0, activeBars: 0, flow: 'charging', tariff: 'medium' });
+  const [status, setStatus] = React.useState<SolarStatus>({
+    percentage: 0,
+    activeBars: 0,
+    flow: 'charging',
+    barColor: 'green',
+    tariff: 'medium',
+  });
   const [percentage, setPercentage] = React.useState(0);
+  const [solaredgeJson, setSolaredgeJson] = React.useState(solaredgeExample);
+  const [solaredgeMessage, setSolaredgeMessage] = React.useState('');
+  const [solaredgeError, setSolaredgeError] = React.useState(false);
+  const [solaredgeApplying, setSolaredgeApplying] = React.useState(false);
   const [view, setView] = React.useState<'home' | 'docs'>(() => window.location.hash === '#api-docs' ? 'docs' : 'home');
 
   const applyStatus = React.useCallback((nextStatus: SolarStatus) => {
@@ -110,6 +140,41 @@ export function App() {
       body: JSON.stringify(body),
     });
     if (response.ok) applyStatus(await response.json());
+  };
+
+  const applySolaredgeJson = async () => {
+    let payload: object;
+    try {
+      payload = JSON.parse(solaredgeJson);
+    } catch {
+      setSolaredgeError(true);
+      setSolaredgeMessage(content.panel.solaredgeInvalidJson);
+      return;
+    }
+
+    setSolaredgeApplying(true);
+    setSolaredgeMessage('');
+    try {
+      const response = await fetch('/api/solaredge-interface', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        setSolaredgeError(true);
+        setSolaredgeMessage(content.panel.apiError(result.error ?? response.statusText));
+        return;
+      }
+      applyStatus(result);
+      setSolaredgeError(false);
+      setSolaredgeMessage(content.panel.solaredgeSuccess);
+    } catch (error) {
+      setSolaredgeError(true);
+      setSolaredgeMessage(content.panel.apiError(error instanceof Error ? error.message : String(error)));
+    } finally {
+      setSolaredgeApplying(false);
+    }
   };
 
   if (view === 'docs') {
@@ -156,6 +221,30 @@ export function App() {
             <button key={level} onClick={() => post('/api/tariff', { level })}>{content.panel.tariffs[level]}</button>
           ))}
         </div>
+      </section>
+
+      <section className="control-panel">
+        <h2>{content.panel.solaredgeSection}</h2>
+        <p className="control-description">{content.panel.solaredgeDescription}</p>
+        <label htmlFor="solaredge-json">{content.panel.solaredgeLabel}</label>
+        <textarea
+          id="solaredge-json"
+          className="json-input"
+          spellCheck={false}
+          value={solaredgeJson}
+          placeholder={content.panel.solaredgePlaceholder}
+          onChange={(event) => setSolaredgeJson(event.target.value)}
+        />
+        <div className="button-row">
+          <button disabled={solaredgeApplying} onClick={applySolaredgeJson}>
+            {solaredgeApplying ? content.panel.solaredgeApplying : content.panel.solaredgeSubmit}
+          </button>
+        </div>
+        {solaredgeMessage && (
+          <p className={`form-message${solaredgeError ? ' error' : ' success'}`} role="status">
+            {solaredgeMessage}
+          </p>
+        )}
       </section>
 
       <section className="control-panel">
