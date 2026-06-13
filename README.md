@@ -37,17 +37,31 @@ rotation `0` and refuses to start with a different display shape so the battery
 cannot be silently cropped or rotated.
 
 - White pixels form the battery outline.
-- Five inner bars represent battery percentage in 20% steps, filling from
-  right to left.
-- `0%` lights no bars.
-- `1-20%`, `21-40%`, `41-60%`, `61-80%`, and `81-100%` light one through five
-  bars respectively.
-- Green bars mean charging.
-- Red bars mean discharging.
-- Blue bars mean exporting surplus energy. Exporting is accepted only at
+- Five inner blocks of two columns represent battery percentage, filling from
+  right to left in 10% steps while preserving the gaps between blocks.
+- `0-9%` lights no columns. Each additional 10% lights one column, so `20%`
+  completes the first block, `40%` completes the second, and `100%` completes
+  all five blocks.
+- Green columns mean charging.
+- Red columns mean discharging.
+- Blue columns mean exporting surplus energy. Exporting is accepted only at
   `100%`.
 - The three-pixel battery terminal represents the electricity tariff: green
   for low, yellow for medium, and red for high.
+
+| Battery level | Active columns | Complete blocks |
+|---:|---:|---:|
+| `0-9%` | 0 | 0 |
+| `10-19%` | 1 | 0 |
+| `20-29%` | 2 | 1 |
+| `30-39%` | 3 | 1 |
+| `40-49%` | 4 | 2 |
+| `50-59%` | 5 | 2 |
+| `60-69%` | 6 | 3 |
+| `70-79%` | 7 | 3 |
+| `80-89%` | 8 | 4 |
+| `90-99%` | 9 | 4 |
+| `100%` | 10 | 5 |
 
 ## API
 
@@ -108,8 +122,9 @@ Content-Type: application/json
 GET /api/status
 ```
 
-The response includes the current solar state, active bars, hardware type,
-display dimensions, and rotation.
+The response includes the current solar state, `activeColumns` (`0-10`),
+`activeBlocks` (`0-5` complete blocks), hardware type, display dimensions, and
+rotation.
 
 ### Discover endpoints
 

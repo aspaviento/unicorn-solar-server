@@ -7,7 +7,8 @@ type BarColor = 'blue' | 'green' | 'red' | 'yellow';
 type Tariff = 'low' | 'medium' | 'high';
 type SolarStatus = {
   percentage: number;
-  activeBars: number;
+  activeBlocks: number;
+  activeColumns: number;
   flow: Flow;
   barColor: BarColor;
   tariff: Tariff;
@@ -47,8 +48,13 @@ function pixelColor(status: SolarStatus, x: number, y: number) {
   if (x === 0 && [2, 3, 4].includes(y)) return tariffColors[status.tariff];
   if ((y === 0 || y === 6) && x >= 1) return 'rgb(245, 248, 252)';
   if ((x === 1 || x === 16) && y >= 1 && y <= 5) return 'rgb(245, 248, 252)';
-  for (const start of barStartColumns.slice(0, status.activeBars)) {
-    if ((x === start || x === start + 1) && y >= 1 && y <= 5) return barColors[status.barColor];
+  let columnsRemaining = status.activeColumns;
+  for (const start of barStartColumns) {
+    for (const column of [start, start + 1]) {
+      if (columnsRemaining <= 0) return null;
+      if (x === column && y >= 1 && y <= 5) return barColors[status.barColor];
+      columnsRemaining -= 1;
+    }
   }
   return null;
 }
@@ -104,7 +110,8 @@ const ApiDocs: React.FunctionComponent = () => (
 export function App() {
   const [status, setStatus] = React.useState<SolarStatus>({
     percentage: 0,
-    activeBars: 0,
+    activeBlocks: 0,
+    activeColumns: 0,
     flow: 'charging',
     barColor: 'green',
     tariff: 'medium',
@@ -194,7 +201,7 @@ export function App() {
         <div className="status-copy">
           <span className="status-kicker">{content.appName}</span>
           <h1>{status.percentage}%</h1>
-          <p>{content.panel.statusSummary(content.panel.flows[status.flow], content.panel.tariffs[status.tariff], status.activeBars)}</p>
+          <p>{content.panel.statusSummary(content.panel.flows[status.flow], content.panel.tariffs[status.tariff], status.activeColumns, status.activeBlocks)}</p>
         </div>
       </section>
 

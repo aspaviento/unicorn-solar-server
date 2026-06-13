@@ -103,9 +103,13 @@ def set_pixel(x, y, color):
         unicorn.setPixel(x, y, *color)
 
 
+def active_columns(percentage):
+    return min(10, max(0, int(percentage // 10)))
+
+
 def render_display():
     """Render the solar state as a horizontal battery on a 17x7 matrix."""
-    active_bars = min(5, max(0, int((state['percentage'] + 19) // 20)))
+    columns_remaining = active_columns(state['percentage'])
     with hardware_lock:
         unicorn.clear()
         unicorn.setBrightness(0.5)
@@ -115,10 +119,13 @@ def render_display():
         for y in range(1, 6):
             set_pixel(1, y, WHITE)
             set_pixel(16, y, WHITE)
-        for start_x in BAR_START_COLUMNS[:active_bars]:
+        for start_x in BAR_START_COLUMNS:
             for x in (start_x, start_x + 1):
+                if columns_remaining <= 0:
+                    break
                 for y in range(1, 6):
                     set_pixel(x, y, BAR_COLORS[state['barColor']])
+                columns_remaining -= 1
         for y in (2, 3, 4):
             set_pixel(0, y, TARIFF_COLORS[state['tariff']])
         unicorn.show()
@@ -255,9 +262,11 @@ def parse_solaredge_power_flow(content):
 
 
 def status_payload():
+    columns = active_columns(state['percentage'])
     return {
         **state,
-        'activeBars': min(5, max(0, int((state['percentage'] + 19) // 20))),
+        'activeBlocks': columns // 2,
+        'activeColumns': columns,
         'height': height,
         'rotation': unicorn.getRotation(),
         'width': width,

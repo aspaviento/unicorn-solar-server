@@ -7,8 +7,8 @@ export const content = {
   },
   panel: {
     batteryAriaLabel: (percentage: number) => `Battery at ${percentage}%`,
-    statusSummary: (flow: string, tariff: string, activeBars: number) =>
-      `${flow} · ${tariff} tariff · ${activeBars} of 5 bars`,
+    statusSummary: (flow: string, tariff: string, activeColumns: number, activeBlocks: number) =>
+      `${flow} · ${tariff} tariff · ${activeColumns} of 10 columns · ${activeBlocks} complete blocks`,
     batterySection: 'Battery and energy flow',
     percentageLabel: (percentage: number) => `Percentage: ${percentage}%`,
     tariffSection: 'Electricity tariff',
@@ -71,7 +71,7 @@ export const content = {
         methods: ['GET'],
         endpoint: '/api/status',
         request: 'None',
-        description: 'Returns percentage, active bars, flow, tariff, display dimensions, rotation, hardware type, and last update information.',
+        description: 'Returns percentage, active columns, complete blocks, flow, tariff, display dimensions, rotation, hardware type, and last update information.',
       },
       {
         methods: ['POST'],

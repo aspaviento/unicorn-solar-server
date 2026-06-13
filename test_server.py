@@ -53,38 +53,51 @@ class SolarServerTest(unittest.TestCase):
     def post_battery(self, percentage, flow='charging'):
         return self.client.post('/api/battery', json={'percentage': percentage, 'flow': flow})
 
-    def test_battery_ranges_activate_expected_bars(self):
+    def test_battery_ranges_activate_expected_columns_and_complete_blocks(self):
         expected = {
-            0: 0,
-            1: 1,
-            20: 1,
-            21: 2,
-            40: 2,
-            41: 3,
-            60: 3,
-            61: 4,
-            80: 4,
-            81: 5,
-            100: 5,
+            0: (0, 0),
+            1: (0, 0),
+            9: (0, 0),
+            10: (1, 0),
+            19: (1, 0),
+            20: (2, 1),
+            29: (2, 1),
+            30: (3, 1),
+            40: (4, 2),
+            50: (5, 2),
+            60: (6, 3),
+            70: (7, 3),
+            80: (8, 4),
+            90: (9, 4),
+            99: (9, 4),
+            100: (10, 5),
         }
-        for percentage, active_bars in expected.items():
+        for percentage, (active_columns, active_blocks) in expected.items():
             with self.subTest(percentage=percentage):
                 response = self.post_battery(percentage)
                 self.assertEqual(response.status_code, 200)
-                self.assertEqual(response.json['activeBars'], active_bars)
+                self.assertEqual(response.json['activeColumns'], active_columns)
+                self.assertEqual(response.json['activeBlocks'], active_blocks)
+                self.assertNotIn('activeBars', response.json)
 
-    def test_bars_fill_from_right_to_left(self):
+    def test_columns_fill_inside_blocks_from_right_to_left(self):
+        self.post_battery(10)
+        self.assertEqual(server.unicorn.pixels[14][1], server.FLOW_COLORS['charging'])
+        self.assertEqual(server.unicorn.pixels[15][1], (0, 0, 0))
+        self.assertEqual(server.unicorn.pixels[11][1], (0, 0, 0))
+
         self.post_battery(20)
         self.assertEqual(server.unicorn.pixels[14][1], server.FLOW_COLORS['charging'])
+        self.assertEqual(server.unicorn.pixels[15][1], server.FLOW_COLORS['charging'])
         self.assertEqual(server.unicorn.pixels[11][1], (0, 0, 0))
-        self.assertEqual(server.unicorn.pixels[2][1], (0, 0, 0))
 
-        self.post_battery(40)
-        self.assertEqual(server.unicorn.pixels[14][1], server.FLOW_COLORS['charging'])
+        self.post_battery(30)
+        self.assertEqual(server.unicorn.pixels[15][1], server.FLOW_COLORS['charging'])
         self.assertEqual(server.unicorn.pixels[11][1], server.FLOW_COLORS['charging'])
+        self.assertEqual(server.unicorn.pixels[12][1], (0, 0, 0))
         self.assertEqual(server.unicorn.pixels[8][1], (0, 0, 0))
 
-    def test_flow_sets_all_active_bars_to_its_color(self):
+    def test_flow_sets_all_active_columns_to_its_color(self):
         for flow in ('charging', 'discharging'):
             with self.subTest(flow=flow):
                 self.post_battery(100, flow)
@@ -120,6 +133,8 @@ class SolarServerTest(unittest.TestCase):
         self.assertEqual(response.json['height'], 7)
         self.assertEqual(response.json['rotation'], 0)
         self.assertEqual(response.json['displayMode'], 'solar')
+        self.assertEqual(response.json['activeColumns'], 0)
+        self.assertEqual(response.json['activeBlocks'], 0)
 
     def test_api_index_lists_available_options(self):
         response = self.client.get('/api/')
@@ -135,7 +150,8 @@ class SolarServerTest(unittest.TestCase):
         response = self.client.post('/api/solaredge-interface', json=SOLAREDGE_CHARGING)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json['percentage'], 48)
-        self.assertEqual(response.json['activeBars'], 3)
+        self.assertEqual(response.json['activeColumns'], 4)
+        self.assertEqual(response.json['activeBlocks'], 2)
         self.assertEqual(response.json['flow'], 'charging')
         self.assertEqual(response.json['barColor'], 'yellow')
         self.assertEqual(server.unicorn.pixels[14][1], server.BAR_COLORS['yellow'])
@@ -144,10 +160,13 @@ class SolarServerTest(unittest.TestCase):
         response = self.client.post('/api/solaredge-interface', json=SOLAREDGE_EXPORTING)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json['percentage'], 99)
-        self.assertEqual(response.json['activeBars'], 5)
+        self.assertEqual(response.json['activeColumns'], 9)
+        self.assertEqual(response.json['activeBlocks'], 4)
         self.assertEqual(response.json['flow'], 'exporting')
         self.assertEqual(response.json['barColor'], 'blue')
         self.assertEqual(server.unicorn.pixels[14][1], server.BAR_COLORS['blue'])
+        self.assertEqual(server.unicorn.pixels[2][1], server.BAR_COLORS['blue'])
+        self.assertEqual(server.unicorn.pixels[3][1], (0, 0, 0))
 
     def test_solaredge_grid_or_storage_source_is_red(self):
         payload = {
