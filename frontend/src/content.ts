@@ -8,7 +8,7 @@ export const content = {
   panel: {
     batteryAriaLabel: (percentage: number) => `Battery at ${percentage}%`,
     statusSummary: (flow: string, tariff: string, activeColumns: number, activeBlocks: number) =>
-      `${flow} · ${tariff} tariff · ${activeColumns} of 10 columns · ${activeBlocks} complete blocks`,
+      `${flow} · ${tariff} tariff · ${activeColumns} of 10 columns · ${activeBlocks} complete ${activeBlocks === 1 ? 'block' : 'blocks'}`,
     batterySection: 'Battery and energy flow',
     percentageLabel: (percentage: number) => `Percentage: ${percentage}%`,
     tariffSection: 'Electricity tariff',

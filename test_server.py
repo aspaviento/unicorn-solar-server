@@ -82,8 +82,8 @@ class SolarServerTest(unittest.TestCase):
 
     def test_columns_fill_inside_blocks_from_right_to_left(self):
         self.post_battery(10)
-        self.assertEqual(server.unicorn.pixels[14][1], server.FLOW_COLORS['charging'])
-        self.assertEqual(server.unicorn.pixels[15][1], (0, 0, 0))
+        self.assertEqual(server.unicorn.pixels[15][1], server.FLOW_COLORS['charging'])
+        self.assertEqual(server.unicorn.pixels[14][1], (0, 0, 0))
         self.assertEqual(server.unicorn.pixels[11][1], (0, 0, 0))
 
         self.post_battery(20)
@@ -93,8 +93,8 @@ class SolarServerTest(unittest.TestCase):
 
         self.post_battery(30)
         self.assertEqual(server.unicorn.pixels[15][1], server.FLOW_COLORS['charging'])
-        self.assertEqual(server.unicorn.pixels[11][1], server.FLOW_COLORS['charging'])
-        self.assertEqual(server.unicorn.pixels[12][1], (0, 0, 0))
+        self.assertEqual(server.unicorn.pixels[12][1], server.FLOW_COLORS['charging'])
+        self.assertEqual(server.unicorn.pixels[11][1], (0, 0, 0))
         self.assertEqual(server.unicorn.pixels[8][1], (0, 0, 0))
 
     def test_flow_sets_all_active_columns_to_its_color(self):
@@ -165,8 +165,8 @@ class SolarServerTest(unittest.TestCase):
         self.assertEqual(response.json['flow'], 'exporting')
         self.assertEqual(response.json['barColor'], 'blue')
         self.assertEqual(server.unicorn.pixels[14][1], server.BAR_COLORS['blue'])
-        self.assertEqual(server.unicorn.pixels[2][1], server.BAR_COLORS['blue'])
-        self.assertEqual(server.unicorn.pixels[3][1], (0, 0, 0))
+        self.assertEqual(server.unicorn.pixels[3][1], server.BAR_COLORS['blue'])
+        self.assertEqual(server.unicorn.pixels[2][1], (0, 0, 0))
 
     def test_solaredge_grid_or_storage_source_is_red(self):
         payload = {

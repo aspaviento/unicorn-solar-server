@@ -120,7 +120,7 @@ def render_display():
             set_pixel(1, y, WHITE)
             set_pixel(16, y, WHITE)
         for start_x in BAR_START_COLUMNS:
-            for x in (start_x, start_x + 1):
+            for x in (start_x + 1, start_x):
                 if columns_remaining <= 0:
                     break
                 for y in range(1, 6):

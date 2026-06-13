@@ -50,7 +50,7 @@ function pixelColor(status: SolarStatus, x: number, y: number) {
   if ((x === 1 || x === 16) && y >= 1 && y <= 5) return 'rgb(245, 248, 252)';
   let columnsRemaining = status.activeColumns;
   for (const start of barStartColumns) {
-    for (const column of [start, start + 1]) {
+    for (const column of [start + 1, start]) {
       if (columnsRemaining <= 0) return null;
       if (x === column && y >= 1 && y <= 5) return barColors[status.barColor];
       columnsRemaining -= 1;
