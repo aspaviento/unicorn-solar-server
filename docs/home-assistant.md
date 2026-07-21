@@ -51,7 +51,8 @@ will be `sensor.unicorn_solar_server`.
 
 `displayMode` can be `solar`, `rainbow`, `standby`, or `off`. Standby is the
 intentional quiet display mode and shows a dim `HH:MM` clock on the physical
-matrix.
+matrix. The dashboard card below keeps showing the normal solar context while
+the entity attributes report whether the physical matrix is in standby.
 
 ## Dashboard Card
 
@@ -93,7 +94,6 @@ cards:
         matrix: |
           [[[
             const attrs = entity.attributes;
-            const displayMode = attrs.displayMode ?? "solar";
             const percentage = Number(attrs.percentage ?? 0);
             const activeColumns = Math.max(0, Math.min(10, Math.floor(percentage / 10)));
             const barColorName = attrs.barColor ?? "green";
@@ -105,7 +105,6 @@ cards:
               red: "#e6373c",
               yellow: "#ffbe00",
               white: "#f5f8fc",
-              standby: "#80beff",
               off: "#202837"
             };
 
@@ -113,19 +112,6 @@ cards:
               low: colors.green,
               medium: colors.yellow,
               high: colors.red
-            };
-
-            const digits = {
-              "0": ["111", "101", "101", "101", "111"],
-              "1": ["010", "110", "010", "010", "111"],
-              "2": ["111", "001", "111", "100", "111"],
-              "3": ["111", "001", "111", "001", "111"],
-              "4": ["101", "101", "111", "001", "001"],
-              "5": ["111", "100", "111", "001", "111"],
-              "6": ["111", "100", "111", "101", "111"],
-              "7": ["111", "001", "010", "010", "010"],
-              "8": ["111", "101", "111", "101", "111"],
-              "9": ["111", "101", "111", "001", "111"]
             };
 
             function renderDot(color) {
@@ -137,30 +123,6 @@ cards:
                 box-shadow:${color === colors.off ? "none" : `0 0 5px ${color}`};
                 display:block;
               "></span>`;
-            }
-
-            if (displayMode === "standby") {
-              const grid = Array.from({ length: 7 }, () => Array(17).fill(colors.off));
-              const setPixel = (x, y, color) => {
-                if (x >= 0 && x < 17 && y >= 0 && y < 7) grid[y][x] = color;
-              };
-              const drawDigit = (digit, xOffset) => {
-                const pattern = digits[digit];
-                for (let y = 0; y < 5; y++) {
-                  for (let x = 0; x < 3; x++) {
-                    if (pattern[y][x] === "1") setPixel(xOffset + x, y + 1, colors.standby);
-                  }
-                }
-              };
-              const now = new Date();
-              const clock = `${String(now.getHours()).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}`;
-              drawDigit(clock[0], 0);
-              drawDigit(clock[1], 4);
-              setPixel(8, 2, colors.standby);
-              setPixel(8, 4, colors.standby);
-              drawDigit(clock[2], 10);
-              drawDigit(clock[3], 14);
-              return grid.flatMap(row => row.map(renderDot)).join("");
             }
 
             const barColor = colors[barColorName] ?? colors.green;
