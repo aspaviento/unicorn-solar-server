@@ -258,6 +258,7 @@ export function App() {
         <h2>{content.panel.displaySection}</h2>
         <div className="button-row">
           <button onClick={() => post('/api/rainbow', {})}>{content.panel.rainbow}</button>
+          <button onClick={() => post('/api/standby', {})}>{content.panel.standby}</button>
           <button onClick={() => post('/api/off', {})}>{content.panel.off}</button>
         </div>
       </section>

@@ -1,5 +1,6 @@
 import unittest
 from copy import deepcopy
+from datetime import datetime
 from unittest.mock import patch
 from pathlib import Path
 
@@ -141,6 +142,7 @@ class SolarServerTest(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json['endpoints']['off']['path'], '/api/off')
         self.assertEqual(response.json['endpoints']['rainbow']['path'], '/api/rainbow')
+        self.assertEqual(response.json['endpoints']['standby']['path'], '/api/standby')
         self.assertEqual(
             response.json['endpoints']['solaredgeInterface']['path'],
             '/api/solaredge-interface',
@@ -210,6 +212,35 @@ class SolarServerTest(unittest.TestCase):
             for x in range(server.DISPLAY_WIDTH)
             for y in range(server.DISPLAY_HEIGHT)
         ))
+
+    def test_standby_draws_dim_clock_with_spacing(self):
+        server.draw_standby_clock(datetime(2026, 7, 21, 23, 48))
+        self.assertEqual(server.unicorn.getBrightness(), server.STANDBY_BRIGHTNESS)
+        for x in (3, 7, 9, 13):
+            for y in range(server.DISPLAY_HEIGHT):
+                self.assertEqual(server.unicorn.pixels[x][y], (0, 0, 0))
+        self.assertEqual(server.unicorn.pixels[8][2], server.STANDBY_COLOR)
+        self.assertEqual(server.unicorn.pixels[8][4], server.STANDBY_COLOR)
+        self.assertEqual(server.unicorn.pixels[14][1], server.STANDBY_COLOR)
+        self.assertEqual(server.unicorn.pixels[15][2], (0, 0, 0))
+        self.assertEqual(server.unicorn.pixels[16][5], server.STANDBY_COLOR)
+
+    def test_standby_endpoint_is_idempotent_and_solar_update_resumes_display(self):
+        response = self.client.post('/api/standby')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json['displayMode'], 'standby')
+        first_thread = server.animation_thread
+        self.assertIsNotNone(first_thread)
+        self.assertEqual(first_thread._target, server.display_standby_clock)
+
+        response = self.client.post('/api/standby')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json['displayMode'], 'standby')
+        self.assertIs(server.animation_thread, first_thread)
+
+        response = self.post_battery(20, 'charging')
+        self.assertEqual(response.json['displayMode'], 'solar')
+        self.assertIsNone(server.animation_thread)
 
     def test_rainbow_starts_and_solar_update_stops_animation(self):
         response = self.client.post('/api/rainbow', json={'brightness': 0.8, 'speed': 0.01})

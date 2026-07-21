@@ -52,6 +52,8 @@ npm run build
   service-conflict behavior explicit when changing install or systemd files.
 - The native display target is a 17x7 Unicorn HAT Mini layout. Do not silently
   change dimensions, rotation, or display assumptions.
+- Keep `/api/standby` distinct from `/api/off`: standby is the visible dim clock
+  mode for intentional quiet periods, while off should turn off every pixel.
 - User-facing frontend labels and descriptions belong in
   `frontend/src/content.ts`.
 

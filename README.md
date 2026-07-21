@@ -146,14 +146,26 @@ Content-Type: application/json
 
 Both values are optional.
 
+### Show standby clock
+
+```http
+GET /api/standby
+```
+
+`POST /api/standby` is also accepted. Standby shows a very dim `HH:MM` clock
+ at brightness `0.05` for overnight visibility with minimal light. Repeated
+standby calls are idempotent and keep the existing standby display running.
+Any battery or tariff update stops standby and restores the solar display.
+
 ### Turn off the display
 
 ```http
 GET /api/off
 ```
 
-`POST /api/off` is also accepted. Any battery or tariff update stops the
-rainbow or off state and restores the solar display.
+`POST /api/off` is also accepted. This stops any animation and turns off every
+display pixel. Any battery or tariff update stops the rainbow, standby, or off
+state and restores the solar display.
 
 ## Installation
 

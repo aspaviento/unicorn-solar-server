@@ -14,6 +14,7 @@ export const content = {
     tariffSection: 'Electricity tariff',
     displaySection: 'Display controls',
     rainbow: 'Rainbow',
+    standby: 'Standby',
     off: 'Off',
     solaredgeSection: 'SolarEdge Interface JSON',
     solaredgeDescription: 'Paste the JSON output from solaredge-interface site_current_power_flow and send it to the display.',
@@ -78,6 +79,12 @@ export const content = {
         endpoint: '/api/rainbow',
         request: '{"brightness": 1, "speed": 0.1}',
         description: 'Starts the hardware validation rainbow. Brightness and speed are optional.',
+      },
+      {
+        methods: ['GET', 'POST'],
+        endpoint: '/api/standby',
+        request: 'None',
+        description: 'Shows a very dim standby clock. Repeated calls keep the existing standby display running.',
       },
       {
         methods: ['GET', 'POST'],

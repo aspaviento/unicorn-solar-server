@@ -33,11 +33,25 @@ TARIFF_COLORS = {
     'medium': (255, 190, 0),
     'high': (230, 55, 60),
 }
+STANDBY_BRIGHTNESS = 0.05
+STANDBY_COLOR = (128, 190, 255)
 WHITE = (245, 248, 252)
 BAR_START_COLUMNS = (14, 11, 8, 5, 2)
 DISPLAY_WIDTH = 17
 DISPLAY_HEIGHT = 7
 DEFAULT_PORT = 9001
+DIGITS = {
+    '0': ('111', '101', '101', '101', '111'),
+    '1': ('010', '110', '010', '010', '111'),
+    '2': ('111', '001', '111', '100', '111'),
+    '3': ('111', '001', '111', '001', '111'),
+    '4': ('101', '101', '111', '001', '001'),
+    '5': ('111', '100', '111', '001', '111'),
+    '6': ('111', '100', '111', '101', '111'),
+    '7': ('111', '001', '010', '010', '010'),
+    '8': ('111', '101', '111', '101', '111'),
+    '9': ('111', '101', '111', '001', '111'),
+}
 
 hardware_lock = threading.RLock()
 animation_thread = None
@@ -107,6 +121,28 @@ def active_columns(percentage):
     return min(10, max(0, int(percentage // 10)))
 
 
+def draw_digit(digit, x_offset, y_offset=1, color=STANDBY_COLOR):
+    for y, row in enumerate(DIGITS[digit]):
+        for x, cell in enumerate(row):
+            if cell == '1':
+                set_pixel(x_offset + x, y_offset + y, color)
+
+
+def draw_standby_clock(now=None):
+    current_time = now or datetime.now()
+    digits = current_time.strftime('%H%M')
+    with hardware_lock:
+        unicorn.clear()
+        unicorn.setBrightness(STANDBY_BRIGHTNESS)
+        draw_digit(digits[0], 0)
+        draw_digit(digits[1], 4)
+        set_pixel(8, 2, STANDBY_COLOR)
+        set_pixel(8, 4, STANDBY_COLOR)
+        draw_digit(digits[2], 10)
+        draw_digit(digits[3], 14)
+        unicorn.show()
+
+
 def render_display():
     """Render the solar state as a horizontal battery on a 17x7 matrix."""
     columns_remaining = active_columns(state['percentage'])
@@ -171,11 +207,33 @@ def display_rainbow(brightness, speed):
         sleep_while_running(current_thread, speed)
 
 
+def display_standby_clock(refresh_seconds=15):
+    current_thread = threading.current_thread()
+    while getattr(current_thread, 'do_run', True):
+        draw_standby_clock()
+        sleep_while_running(current_thread, refresh_seconds)
+
+
 def start_rainbow(brightness=1, speed=0.1):
     global animation_thread
     stop_animation()
     state['displayMode'] = 'rainbow'
     animation_thread = threading.Thread(target=display_rainbow, args=(brightness, speed), daemon=True)
+    animation_thread.do_run = True
+    animation_thread.start()
+
+
+def start_standby_display():
+    global animation_thread
+    if (
+        state['displayMode'] == 'standby'
+        and animation_thread is not None
+        and animation_thread.is_alive()
+    ):
+        return
+    stop_animation()
+    state['displayMode'] = 'standby'
+    animation_thread = threading.Thread(target=display_standby_clock, daemon=True)
     animation_thread.do_run = True
     animation_thread.start()
 
@@ -287,6 +345,7 @@ def api_index():
             'off': {'methods': ['GET', 'POST'], 'path': '/api/off'},
             'rainbow': {'methods': ['POST'], 'path': '/api/rainbow'},
             'solaredgeInterface': {'methods': ['POST'], 'path': '/api/solaredge-interface'},
+            'standby': {'methods': ['GET', 'POST'], 'path': '/api/standby'},
             'status': {'methods': ['GET'], 'path': '/api/status'},
             'tariff': {'methods': ['POST'], 'path': '/api/tariff'},
         }
@@ -348,6 +407,13 @@ def api_tariff():
 def api_off():
     touch('/api/off')
     switch_off()
+    return jsonify(status_payload())
+
+
+@app.route('/api/standby', methods=['GET', 'POST'])
+def api_standby():
+    touch('/api/standby')
+    start_standby_display()
     return jsonify(status_payload())
 
 
