@@ -4,12 +4,15 @@ After=network.target busylight.service
 Conflicts=busylight.service
 
 [Service]
-User=root
+Type=simple
+User=pi
+Group=pi
 WorkingDirectory=/home/pi/unicorn-solar-server
-ExecStart=/home/pi/unicorn-solar-server/.venv/bin/python server.py
+ExecStart=/home/pi/.env/bin/python /home/pi/unicorn-solar-server/server.py
 Restart=always
 Environment=FLASK_CONFIG=production
 Environment=UNICORN_SOLAR_PORT=9001
+Environment=PYTHONUNBUFFERED=1
 
 [Install]
 WantedBy=multi-user.target

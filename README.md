@@ -175,8 +175,41 @@ The installer supports Raspberry Pi OS and Ubuntu:
 curl -LSs https://raw.githubusercontent.com/aspaviento/unicorn-solar-server/master/install.sh | sudo bash -
 ```
 
-Solar Server is installed as `unicorn-solar.service` and listens on port
-`9001`.
+Solar Server is installed as `unicorn-solar.service`, runs as the installing
+user (`pi` on a normal Raspberry Pi install), and listens on port `9001`.
+
+The installer is self-contained for the Python runtime used by this service. It
+does not depend on Pimoroni's `unicornhatmini-python/install.sh` installer and
+does not create a virtual environment with `--system-site-packages`. Instead it:
+
+- installs base system packages needed to create and build Python virtual
+  environments: `python3-pip`, `python3-dev`, and `python3-venv`;
+- creates an isolated virtual environment at `/home/<user>/.env` by default;
+- installs this project's `requirements.txt` into that virtual environment,
+  including `unicornhatmini`, `unicornhat`, `RPi.GPIO`, `gpiozero`, `spidev`,
+  and the Flask server dependencies;
+- writes a systemd unit that starts the server with
+  `/home/<user>/.env/bin/python`.
+
+The Unicorn HAT Mini still requires SPI to be enabled on the Raspberry Pi. If
+the HAT is newly installed or the OS image is fresh, enable SPI before starting
+the service:
+
+```bash
+sudo raspi-config nonint do_spi 0
+```
+
+Pimoroni's
+[Unicorn HAT Mini getting started guide](https://learn.pimoroni.com/article/getting-started-with-unicorn-hat-mini)
+is useful for hardware setup and examples, but the Solar Server deployment
+should use this repository's installer so service dependencies remain isolated
+from system Python package removals.
+
+Custom install options are available when running a local checkout:
+
+```bash
+sudo ./install.sh --user pi --venv-dir /home/pi/.env --install-dir /home/pi/unicorn-solar-server
+```
 
 ```bash
 systemctl status unicorn-solar.service
@@ -228,14 +261,18 @@ sudo systemctl enable --now busylight.service
 Create a Python environment and run the server:
 
 ```bash
-python3 -m venv --system-site-packages .venv
-.venv/bin/pip install flask flask-cors jsmin
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt
 .venv/bin/python server.py
 ```
 
 Without compatible hardware, the wrapper automatically uses a 17x7 dummy
 display. The server and control panel are available at
 `http://localhost:9001/`.
+
+To force the dummy display on a Raspberry Pi that does have the HAT attached,
+set `UNICORN_FORCE_DUMMY=1`. This is useful for running backend tests without
+touching the physical display.
 
 Build the frontend:
 
@@ -251,6 +288,7 @@ All user-facing frontend labels and descriptions are centralized in
 Run the backend tests:
 
 ```bash
+UNICORN_FORCE_DUMMY=1 \
 .venv/bin/python -m unittest -v
 ```
 

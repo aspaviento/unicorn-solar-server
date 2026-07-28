@@ -26,8 +26,8 @@ Use the project README as the primary source for setup. Before committing code
 changes, run the relevant checks:
 
 ```bash
-python3 -m venv --system-site-packages .venv
-.venv/bin/pip install flask flask-cors jsmin
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt
 .venv/bin/python -m unittest -v
 ```
 

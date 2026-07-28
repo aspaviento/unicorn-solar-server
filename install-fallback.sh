@@ -3,12 +3,27 @@
 set -e
 
 INSTALL_DIR="$(cd "$(dirname "$0")" && pwd)"
+INSTALL_USER="${SUDO_USER:-$USER}"
+INSTALL_GROUP="$(id -gn "$INSTALL_USER")"
+USER_HOME="$(getent passwd "$INSTALL_USER" | cut -d: -f6)"
+VENV_DIR="${USER_HOME:-/home/$INSTALL_USER}/.env"
 
 sudo apt-get install -y python3-pip python3-dev python3-venv
-python3 -m venv --system-site-packages "$INSTALL_DIR/.venv"
-"$INSTALL_DIR/.venv/bin/pip" install -r "$INSTALL_DIR/requirements.txt"
+if [ ! -d "$VENV_DIR" ]; then
+    sudo -u "$INSTALL_USER" python3 -m venv "$VENV_DIR"
+fi
+sudo -u "$INSTALL_USER" "$VENV_DIR/bin/python" -m pip install --upgrade pip
+sudo -u "$INSTALL_USER" "$VENV_DIR/bin/python" -m pip install -r "$INSTALL_DIR/requirements.txt"
 
-sudo cp "$INSTALL_DIR/unicorn-solar.service" /etc/systemd/system/unicorn-solar.service
+SERVICE_FILE="$(mktemp)"
+sed \
+    -e "s|^User=.*|User=$INSTALL_USER|g" \
+    -e "s|^Group=.*|Group=$INSTALL_GROUP|g" \
+    -e "s|^WorkingDirectory=.*|WorkingDirectory=$INSTALL_DIR|g" \
+    -e "s|^ExecStart=.*|ExecStart=$VENV_DIR/bin/python $INSTALL_DIR/server.py|g" \
+    "$INSTALL_DIR/unicorn-solar.service" > "$SERVICE_FILE"
+sudo install -m 0644 "$SERVICE_FILE" /etc/systemd/system/unicorn-solar.service
+rm "$SERVICE_FILE"
 sudo systemctl daemon-reload
 if systemctl list-unit-files busylight.service > /dev/null 2>&1; then
     sudo systemctl disable --now busylight.service

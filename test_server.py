@@ -1,8 +1,11 @@
+import os
 import unittest
 from copy import deepcopy
 from datetime import datetime
 from unittest.mock import patch
 from pathlib import Path
+
+os.environ['UNICORN_FORCE_DUMMY'] = '1'
 
 import server
 from lib import unicorn_wrapper
@@ -316,7 +319,10 @@ class InstallationIsolationTest(unittest.TestCase):
         self.assertNotIn('/etc/systemd/system/busylight.service', installers)
         self.assertIn('unicorn-solar.service', installers)
         self.assertIn('UNICORN_SOLAR_PORT=9001', service)
-        self.assertIn('/home/pi/unicorn-solar-server/.venv/bin/python server.py', service)
+        self.assertIn('User=pi', service)
+        self.assertIn('Group=pi', service)
+        self.assertIn('/home/pi/.env/bin/python /home/pi/unicorn-solar-server/server.py', service)
+        self.assertNotIn('--system-site-packages', installers)
         self.assertEqual(server.DEFAULT_PORT, 9001)
 
     def test_frontend_literals_are_centralized(self):
