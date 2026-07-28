@@ -46,6 +46,9 @@ npm run build
 - Do not assume the service is currently deployed or running anywhere. Verify
   live deployment state outside this public repository before operational work.
 - Keep private operation notes in a private location outside this repo.
+- Do not assume a deployed Raspberry Pi runtime directory is a Git checkout.
+  Existing installs may be updated by copying validated files from a source
+  checkout into the runtime tree, then restarting and validating the service.
 - Preserve the public service identity documented here: `unicorn-solar.service`
   and default HTTP port `9001`.
 - Only one Unicorn HAT Mini service should control the hardware at a time; keep

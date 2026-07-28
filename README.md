@@ -211,6 +211,27 @@ Custom install options are available when running a local checkout:
 sudo ./install.sh --user pi --venv-dir /home/pi/.env --install-dir /home/pi/unicorn-solar-server
 ```
 
+### Runtime deployment model
+
+The Raspberry Pi runtime directory does not have to be a Git checkout. The
+installer can clone the project when it needs to create a fresh install, but an
+installed service is just a working runtime tree plus a systemd unit.
+
+For existing installations, the expected update flow is:
+
+1. validate changes in a separate source checkout;
+2. copy the validated files into the Raspberry Pi runtime directory with a
+   controlled file copy tool such as `rsync` or `scp`;
+3. keep a short-lived backup of any runtime file being replaced when the change
+   is operationally sensitive;
+4. reload systemd only if the unit file changed;
+5. restart `unicorn-solar.service` only when server code, dependencies, or the
+   unit file changed;
+6. validate `GET /api/status` and, when appropriate, post a real solar update.
+
+Do not rely on `git pull` inside the runtime directory unless you have
+explicitly installed that directory as a Git checkout.
+
 ```bash
 systemctl status unicorn-solar.service
 ```
