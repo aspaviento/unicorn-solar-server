@@ -24,7 +24,7 @@ except BaseException:
 
 class UnicornWrapper:
     def __init__(self, hat = None):
-        if os.getenv('UNICORN_FORCE_DUMMY') == '1':
+        if hat is None and os.getenv('UNICORN_FORCE_DUMMY') == '1':
             hat = 'dummy'
 
         if hat is None:
