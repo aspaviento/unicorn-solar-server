@@ -36,6 +36,19 @@ export const content = {
       high: 'High',
     },
   },
+  settings: {
+    title: 'Configuration',
+    description: 'Daily periods of expected high consumption are shown with a violet battery outline. This indicates a schedule, not measured consumption or confirmed equipment operation.',
+    windows: 'Expected high consumption windows',
+    placeholder: '08:00-09:00,12:00-14:00',
+    help: 'Paste comma-separated HH:MM-HH:MM windows, using the same format as BlueConnect. Start is included; end is excluded. Overnight windows are supported. Leave empty to disable.',
+    timezone: 'Time zone (IANA)',
+    save: 'Save configuration',
+    saving: 'Saving...',
+    saved: 'Configuration saved. Daylight saving changes are handled automatically.',
+    loadFailed: 'Could not load configuration. Reload the page to retry.',
+    active: 'Expected high consumption period · violet outline',
+  },
   docs: {
     title: 'Server API',
     description: 'HTTP endpoints available to update and inspect the solar battery display.',
@@ -44,6 +57,12 @@ export const content = {
     requestLabel: 'Request body',
     descriptionLabel: 'Description',
     endpoints: [
+      {
+        methods: ['GET', 'POST'],
+        endpoint: '/api/settings',
+        request: '{"windows": "08:00-09:00,12:00-14:00", "timezone": "Europe/Madrid"}',
+        description: 'Reads or saves daily expected high consumption windows and IANA time zone. An empty windows string disables the indication. Settings persist across restarts.',
+      },
       {
         methods: ['GET'],
         endpoint: '/api/',
@@ -72,7 +91,7 @@ export const content = {
         methods: ['GET'],
         endpoint: '/api/status',
         request: 'None',
-        description: 'Returns percentage, active columns, complete blocks, flow, tariff, display dimensions, rotation, hardware type, and last update information.',
+        description: 'Returns percentage, active columns, complete blocks, flow, tariff, display dimensions, rotation, hardware type, last update information, and highConsumptionExpected (scheduled, not measured).',
       },
       {
         methods: ['POST'],

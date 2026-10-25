@@ -36,7 +36,8 @@ The server requires the Unicorn HAT Mini's native 17x7 orientation. It sets
 rotation `0` and refuses to start with a different display shape so the battery
 cannot be silently cropped or rotated.
 
-- White pixels form the battery outline.
+- White pixels form the battery outline; configured expected high-consumption
+  periods change only that outline to violet.
 - Five inner blocks of two columns represent battery percentage, filling from
   right to left in 10% steps while preserving the gaps between blocks.
 - `0-9%` lights no columns. Each additional 10% lights one column, so `20%`
@@ -63,7 +64,74 @@ cannot be silently cropped or rotated.
 | `90-99%` | 9 | 4 |
 | `100%` | 10 | 5 |
 
+## Expected high consumption periods
+
+Open **Configuration** in the web panel and paste daily windows using the
+same format as BlueConnect, for example:
+
+```text
+08:00-09:00,12:00-14:00
+```
+
+Select an IANA time zone (default `Europe/Madrid`) and click **Save
+configuration**. The battery outline is violet inside a configured window
+and white otherwise. Battery fill, energy-flow colors, brightness, and the
+tariff terminal remain unchanged. This is a **scheduled expectation**, not a
+power measurement or confirmation that equipment is running. BlueConnect and
+Solar Server have independent configuration; there is no automatic sync.
+
+- Windows apply every day. Adjust them when seasonal equipment schedules change.
+- Start is inclusive and end is exclusive: `08:00-09:00` ends at exactly 09:00.
+- Overnight windows such as `23:00-01:00` are supported. Overlaps act as a union.
+- Equal start/end, invalid times, and invalid time zones are rejected.
+- Leave the windows field empty and save to disable the indication (the default).
+- IANA time zones automatically follow daylight saving changes. Repeated local
+  times use the same window on both occurrences; skipped local times never occur.
+- A background monitor checks once per second; no new solar/tariff update or
+  cron change is needed at window boundaries. Standby, off, and rainbow retain
+  priority and are never interrupted by a schedule transition or settings save.
+- The web preview polls status every five seconds. Its solar diagram remains
+  informational even when the physical display is in another mode.
+
+![Consumption settings with a synthetic example](assets/consumption-settings.png)
+
+### Persistent configuration
+
+Settings are stored atomically outside the source checkout, by default in
+`~/.config/unicorn-solar-server/settings.json` for the **service user**.
+`XDG_CONFIG_HOME` changes the configuration root; `UNICORN_SOLAR_SETTINGS_PATH`
+can override the complete filename. The parent directory is created on first
+save and must be writable by the service user. Back up this file separately
+from the product source. No restart is needed after saving through the panel.
+
+Settings survive service restarts and source deployments. A failed save returns
+an error and retains the previous file and runtime configuration. If a file
+cannot be read or validated at startup, the service logs the error and disables
+the indication until valid settings are saved. A missing file uses defaults.
+Manual file edits are loaded only on the next service start; prefer the panel.
+The normal startup rainbow still waits for the next solar/tariff update.
+
 ## API
+
+### Read or save configuration
+
+```http
+GET /api/settings
+POST /api/settings
+Content-Type: application/json
+
+{"windows": "08:00-09:00,12:00-14:00", "timezone": "Europe/Madrid"}
+```
+
+GET returns the saved `windows` and `timezone`. POST requires both fields,
+validates them, and returns the normalized saved values. Invalid input returns
+HTTP 400; a persistence failure returns HTTP 500. Empty `windows` disables the
+indication. There is no default household schedule.
+
+`GET /api/status` additionally returns `highConsumptionExpected`, a boolean
+computed from the current time, independently of the age of solar telemetry
+and the display mode. Schedule transitions do not change `lastCalled` or
+`lastCalledApi`, which continue to describe external display updates.
 
 ### Update battery
 

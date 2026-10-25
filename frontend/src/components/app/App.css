@@ -476,3 +476,18 @@
     display: none;
   }
 }
+
+.settings-input {
+  box-sizing: border-box;
+  display: block;
+  width: 100%;
+  margin: 10px 0 16px;
+  padding: 12px;
+  border: 1px solid var(--app-border);
+  border-radius: 8px;
+  background: var(--app-panel-subtle);
+  color: var(--app-text);
+  font: inherit;
+}
+.settings-input:focus-visible { outline: 2px solid #bf70ff; outline-offset: 2px; }
+.status-copy .consumption-notice { color: light-dark(#7138a8, #cc95ff); }

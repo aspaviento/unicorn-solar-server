@@ -36,6 +36,7 @@ rest:
           - barColor
           - displayMode
           - flow
+          - highConsumptionExpected
           - height
           - lastCalled
           - lastCalledApi
@@ -53,6 +54,13 @@ will be `sensor.unicorn_solar_server`.
 intentional quiet display mode and shows a dim `HH:MM` clock on the physical
 matrix. The dashboard card below keeps showing the normal solar context while
 the entity attributes report whether the physical matrix is in standby.
+
+`highConsumptionExpected` reports whether the current time falls inside a
+configured daily consumption window. It is a scheduled expectation, not measured
+load or equipment state. Configure it in the Solar Server web panel; this does
+not read or modify BlueConnect settings. Add the attribute below to an existing
+REST sensor if upgrading. The sample card uses violet for the outline while
+this attribute is true, with up to the REST polling interval of delay.
 
 ## Dashboard Card
 
@@ -105,6 +113,7 @@ cards:
               red: "#e6373c",
               yellow: "#ffbe00",
               white: "#f5f8fc",
+              violet: "#bf70ff",
               off: "#202837"
             };
 
@@ -153,7 +162,7 @@ cards:
             for (let y = 0; y < 7; y++) {
               for (let x = 0; x < 17; x++) {
                 let color = colors.off;
-                if (isOutline(x, y)) color = colors.white;
+                if (isOutline(x, y)) color = attrs.highConsumptionExpected === true ? colors.violet : colors.white;
                 if (isBatteryFill(x, y)) color = barColor;
                 if (isTariff(x, y)) color = tariffColors[tariff] ?? colors.yellow;
 
@@ -195,6 +204,11 @@ cards:
         entity: sensor.unicorn_solar_server
         attribute: displayMode
         name: Display Mode
+
+      - type: attribute
+        entity: sensor.unicorn_solar_server
+        attribute: highConsumptionExpected
+        name: Expected High Consumption
 
       - type: attribute
         entity: sensor.unicorn_solar_server

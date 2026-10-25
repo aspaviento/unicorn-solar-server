@@ -12,6 +12,7 @@ type SolarStatus = {
   flow: Flow;
   barColor: BarColor;
   tariff: Tariff;
+  highConsumptionExpected?: boolean;
 };
 
 const barColors: Record<BarColor, string> = {
@@ -46,8 +47,9 @@ const solaredgeExample = `{
 
 function pixelColor(status: SolarStatus, x: number, y: number) {
   if (x === 0 && [2, 3, 4].includes(y)) return tariffColors[status.tariff];
-  if ((y === 0 || y === 6) && x >= 1) return 'rgb(245, 248, 252)';
-  if ((x === 1 || x === 16) && y >= 1 && y <= 5) return 'rgb(245, 248, 252)';
+  const outline = status.highConsumptionExpected ? 'rgb(191, 112, 255)' : 'rgb(245, 248, 252)';
+  if ((y === 0 || y === 6) && x >= 1) return outline;
+  if ((x === 1 || x === 16) && y >= 1 && y <= 5) return outline;
   let columnsRemaining = status.activeColumns;
   for (const start of barStartColumns) {
     for (const column of [start + 1, start]) {
@@ -128,12 +130,27 @@ export function App() {
     setPercentage(nextStatus.percentage);
   }, []);
 
+  const initialized = React.useRef(false);
   const refresh = React.useCallback(async () => {
     const response = await fetch('/api/status');
-    if (response.ok) applyStatus(await response.json());
+    if (response.ok) {
+      const next = await response.json();
+      if (!initialized.current) {
+        applyStatus(next);
+        initialized.current = true;
+      } else {
+        // Polling must not overwrite a pending manual slider selection.
+        setStatus(next);
+      }
+    }
   }, [applyStatus]);
 
-  React.useEffect(() => { refresh(); }, [refresh]);
+  React.useEffect(() => {
+    const poll = () => { refresh().catch(() => {}); };
+    poll();
+    const timer = window.setInterval(poll, 5000);
+    return () => window.clearInterval(timer);
+  }, [refresh]);
   React.useEffect(() => {
     const handleHashChange = () => setView(window.location.hash === '#api-docs' ? 'docs' : 'home');
     window.addEventListener('hashchange', handleHashChange);
@@ -201,6 +218,7 @@ export function App() {
         <div className="status-copy">
           <span className="status-kicker">{content.appName}</span>
           <h1>{status.percentage}%</h1>
+          {status.highConsumptionExpected && <p className="consumption-notice" role="status">{content.settings.active}</p>}
           <p>{content.panel.statusSummary(content.panel.flows[status.flow], content.panel.tariffs[status.tariff], status.activeColumns, status.activeBlocks)}</p>
         </div>
       </section>
@@ -254,6 +272,8 @@ export function App() {
         )}
       </section>
 
+      <ConsumptionSettings onSaved={refresh} />
+
       <section className="control-panel">
         <h2>{content.panel.displaySection}</h2>
         <div className="button-row">
@@ -264,4 +284,74 @@ export function App() {
       </section>
     </main>
   );
+}
+
+function ConsumptionSettings({ onSaved }: { onSaved: () => Promise<void> }) {
+  const [windows, setWindows] = React.useState('');
+  const [timezone, setTimezone] = React.useState('Europe/Madrid');
+  const [loaded, setLoaded] = React.useState(false);
+  const [saving, setSaving] = React.useState(false);
+  const [message, setMessage] = React.useState('');
+  const [error, setError] = React.useState(false);
+  React.useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const response = await fetch('/api/settings');
+        if (!response.ok) throw new Error(content.settings.loadFailed);
+        const settings = await response.json();
+        if (!cancelled) {
+          setWindows(settings.windows);
+          setTimezone(settings.timezone);
+          setLoaded(true);
+        }
+      } catch {
+        if (!cancelled) { setError(true); setMessage(content.settings.loadFailed); }
+      }
+    };
+    load();
+    return () => { cancelled = true; };
+  }, []);
+  const save = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setSaving(true);
+    setMessage('');
+    try {
+      const response = await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ windows, timezone }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || response.statusText);
+      setWindows(result.windows);
+      setTimezone(result.timezone);
+      setError(false);
+      setMessage(content.settings.saved);
+      onSaved().catch(() => {});
+    } catch (error) {
+      setError(true);
+      setMessage(content.panel.apiError(error instanceof Error ? error.message : String(error)));
+    } finally {
+      setSaving(false);
+    }
+  };
+  return <section className="control-panel" id="configuration">
+    <h2>{content.settings.title}</h2>
+    <p className="control-description">{content.settings.description}</p>
+    <form onSubmit={save}>
+      <label htmlFor="consumption-windows">{content.settings.windows}</label>
+      <input className="settings-input" id="consumption-windows" type="text" maxLength={2048}
+        disabled={!loaded || saving} value={windows} placeholder={content.settings.placeholder}
+        aria-describedby="windows-help" onChange={event => setWindows(event.target.value)} />
+      <p className="control-description" id="windows-help">{content.settings.help}</p>
+      <label htmlFor="consumption-timezone">{content.settings.timezone}</label>
+      <input className="settings-input" id="consumption-timezone" type="text" required
+        disabled={!loaded || saving} value={timezone} onChange={event => setTimezone(event.target.value)} />
+      <div className="button-row"><button type="submit" disabled={!loaded || saving}>
+        {saving ? content.settings.saving : content.settings.save}
+      </button></div>
+      {message && <p className={`form-message${error ? ' error' : ' success'}`} role={error ? 'alert' : 'status'}>{message}</p>}
+    </form>
+  </section>;
 }

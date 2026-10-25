@@ -40,6 +40,9 @@ SOLAREDGE_EXPORTING = {
 
 class SolarServerTest(unittest.TestCase):
     def setUp(self):
+        settings = patch.object(server, 'consumption_settings', dict(server.schedule.DEFAULT_SETTINGS))
+        settings.start()
+        self.addCleanup(settings.stop)
         self.client = server.app.test_client()
         server.stop_animation()
         server.state.update({

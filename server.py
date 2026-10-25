@@ -12,6 +12,7 @@ from flask_cors import CORS
 from jsmin import jsmin
 
 from lib.unicorn_wrapper import UnicornWrapper
+from lib import consumption_schedule as schedule
 
 BAR_COLORS = {
     'blue': (30, 120, 255),
@@ -78,11 +79,46 @@ class SolarFlaskApp(Flask):
         if not self.debug or os.getenv('WERKZEUG_RUN_MAIN') == 'true':
             with self.app_context():
                 start_rainbow()
+                start_schedule_monitor()
         super().run(host=host, port=port, debug=debug, load_dotenv=load_dotenv, **options)
 
 
 app = SolarFlaskApp(__name__, static_folder='frontend/build', static_url_path='/')
 CORS(app, resources={r'/api/*': {'origins': '*'}})
+
+
+try:
+    consumption_settings = schedule.load_settings()
+except (OSError, ValueError):
+    app.logger.exception('Cannot load consumption settings; scheduled indication disabled')
+    consumption_settings = dict(schedule.DEFAULT_SETTINGS)
+consumption_active = schedule.is_active(consumption_settings)
+schedule_thread = None
+
+
+def refresh_consumption_schedule(now=None):
+    """Only repaint solar mode on transitions; never wake standby/off/rainbow."""
+    global consumption_active
+    with hardware_lock:
+        active = schedule.is_active(consumption_settings, now)
+        changed = active != consumption_active
+        consumption_active = active
+        if changed and state['displayMode'] == 'solar':
+            render_display()
+        return active
+
+
+def monitor_schedule():
+    while True:
+        refresh_consumption_schedule()
+        sleep(1)
+
+
+def start_schedule_monitor():
+    global schedule_thread
+    if schedule_thread is None or not schedule_thread.is_alive():
+        schedule_thread = threading.Thread(target=monitor_schedule, daemon=True)
+        schedule_thread.start()
 
 
 def read_json_body():
@@ -147,14 +183,15 @@ def render_display():
     """Render the solar state as a horizontal battery on a 17x7 matrix."""
     columns_remaining = active_columns(state['percentage'])
     with hardware_lock:
+        outline = schedule.VIOLET if schedule.is_active(consumption_settings) else WHITE
         unicorn.clear()
         unicorn.setBrightness(0.5)
         for x in range(1, DISPLAY_WIDTH):
-            set_pixel(x, 0, WHITE)
-            set_pixel(x, 6, WHITE)
+            set_pixel(x, 0, outline)
+            set_pixel(x, 6, outline)
         for y in range(1, 6):
-            set_pixel(1, y, WHITE)
-            set_pixel(16, y, WHITE)
+            set_pixel(1, y, outline)
+            set_pixel(16, y, outline)
         for start_x in BAR_START_COLUMNS:
             for x in (start_x + 1, start_x):
                 if columns_remaining <= 0:
@@ -323,6 +360,7 @@ def status_payload():
     columns = active_columns(state['percentage'])
     return {
         **state,
+        'highConsumptionExpected': schedule.is_active(consumption_settings),
         'activeBlocks': columns // 2,
         'activeColumns': columns,
         'height': height,
@@ -341,6 +379,7 @@ def root():
 def api_index():
     return jsonify({
         'endpoints': {
+            'settings': {'methods': ['GET', 'POST'], 'path': '/api/settings'},
             'battery': {'methods': ['POST'], 'path': '/api/battery'},
             'off': {'methods': ['GET', 'POST'], 'path': '/api/off'},
             'rainbow': {'methods': ['POST'], 'path': '/api/rainbow'},
@@ -350,6 +389,29 @@ def api_index():
             'tariff': {'methods': ['POST'], 'path': '/api/tariff'},
         }
     })
+
+
+@app.route('/api/settings', methods=['GET', 'POST'])
+def api_settings():
+    global consumption_settings
+    with hardware_lock:
+        if request.method == 'GET':
+            return jsonify(consumption_settings)
+        content, error_response = read_json_body()
+        if error_response is not None:
+            return error_response
+        try:
+            settings = schedule.validate_settings(content)
+        except ValueError as error:
+            return jsonify({'error': str(error)}), 400
+        try:
+            schedule.save_settings(settings)
+        except OSError:
+            app.logger.exception('Cannot save consumption settings')
+            return jsonify({'error': 'Cannot save settings; previous configuration retained'}), 500
+        consumption_settings = settings
+        refresh_consumption_schedule()
+        return jsonify(consumption_settings)
 
 
 @app.route('/api/battery', methods=['POST'])
