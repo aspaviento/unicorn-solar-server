@@ -57,8 +57,10 @@ the entity attributes report whether the physical matrix is in standby.
 
 `highConsumptionExpected` reports whether the current time falls inside a
 configured daily consumption window. It is a scheduled expectation, not measured
-load or equipment state. Configure it in the Solar Server web panel; this does
-not read or modify BlueConnect settings. Add the attribute below to an existing
+load or equipment state. This optional indication is disabled when no windows
+are configured. Set the windows in the Solar Server web panel, for example for
+a pool pump, irrigation system, or other scheduled household load. It does not
+require another integration. Add the attribute below to an existing
 REST sensor if upgrading. The sample card uses violet for the outline while
 this attribute is true, with up to the REST polling interval of delay.
 

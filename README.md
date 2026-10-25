@@ -66,8 +66,16 @@ cannot be silently cropped or rotated.
 
 ## Expected high consumption periods
 
-Open **Configuration** in the web panel and paste daily windows using the
-same format as BlueConnect, for example:
+The panel can optionally indicate daily periods when you expect high household
+electricity consumption, for example from a pool filtration pump, an irrigation
+system, or other scheduled motors. This gives context for the battery level
+and energy flow without changing how those values or the tariff are displayed.
+
+**This feature is disabled by default.** If you do not configure any windows,
+the battery keeps its normal white outline. No other integration is required.
+
+To enable it, open **Configuration** in the web panel and enter daily windows
+as comma-separated `HH:MM-HH:MM` ranges, for example:
 
 ```text
 08:00-09:00,12:00-14:00
@@ -77,8 +85,8 @@ Select an IANA time zone (default `Europe/Madrid`) and click **Save
 configuration**. The battery outline is violet inside a configured window
 and white otherwise. Battery fill, energy-flow colors, brightness, and the
 tariff terminal remain unchanged. This is a **scheduled expectation**, not a
-power measurement or confirmation that equipment is running. BlueConnect and
-Solar Server have independent configuration; there is no automatic sync.
+power measurement or confirmation that equipment is running. The panel does
+not control the equipment; it simply highlights the periods you configure.
 
 - Windows apply every day. Adjust them when seasonal equipment schedules change.
 - Start is inclusive and end is exclusive: `08:00-09:00` ends at exactly 09:00.
@@ -93,7 +101,7 @@ Solar Server have independent configuration; there is no automatic sync.
 - The web preview polls status every five seconds. Its solar diagram remains
   informational even when the physical display is in another mode.
 
-![Consumption settings with a synthetic example](assets/consumption-settings.png)
+![Optional consumption settings; empty windows disable the indication](assets/consumption-settings.png)
 
 ### Persistent configuration
 

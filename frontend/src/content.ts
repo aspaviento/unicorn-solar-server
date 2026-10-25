@@ -38,10 +38,10 @@ export const content = {
   },
   settings: {
     title: 'Configuration',
-    description: 'Daily periods of expected high consumption are shown with a violet battery outline. This indicates a schedule, not measured consumption or confirmed equipment operation.',
+    description: 'Optionally highlight expected high household consumption with a violet battery outline, for example for a pool pump, irrigation system, or other scheduled motors. This indicates a schedule, not measured consumption or confirmed equipment operation.',
     windows: 'Expected high consumption windows',
     placeholder: '08:00-09:00,12:00-14:00',
-    help: 'Paste comma-separated HH:MM-HH:MM windows, using the same format as BlueConnect. Start is included; end is excluded. Overnight windows are supported. Leave empty to disable.',
+    help: 'Enter comma-separated HH:MM-HH:MM windows. No windows means no indication. Start is included; end is excluded. Overnight windows are supported. Leave empty to disable.',
     timezone: 'Time zone (IANA)',
     save: 'Save configuration',
     saving: 'Saving...',
