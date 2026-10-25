@@ -3,6 +3,10 @@
 Display the battery, energy flow, and current electricity tariff of a domestic
 solar installation on a Raspberry Pi with a Pimoroni Unicorn HAT Mini.
 
+Current release: [v1.1.0](https://github.com/aspaviento/unicorn-solar-server/releases/tag/v1.1.0).
+See the [changelog](CHANGELOG.md) for changes since v1.0.0 and the
+[security policy](SECURITY.md) for supported releases and private reporting.
+
 The project provides:
 
 - A 17x7 battery display designed for Unicorn HAT Mini.
