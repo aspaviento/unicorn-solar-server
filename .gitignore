@@ -6,3 +6,5 @@ __pycache__/
 .coverage
 .pytest_cache/
 .DS_Store
+
+examples/cron/mock-data/.panel-cron.lock

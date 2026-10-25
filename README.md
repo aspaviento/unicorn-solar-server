@@ -64,6 +64,21 @@ cannot be silently cropped or rotated.
 | `90-99%` | 9 | 4 |
 | `100%` | 10 | 5 |
 
+## Scheduling the panel with cron
+
+For unattended Linux operation, the recommended approach is a small cron-driven
+controller that posts current battery/tariff data during daylight and calls
+`/api/standby` outside that period. Sunrise/sunset and live data come from your
+own providers; the server does not retrieve or schedule them automatically.
+All producers must respect the daylight gate, since battery or tariff updates
+exit standby.
+
+Follow the [step-by-step cron guide](docs/cron.md) and try the
+[example shell script](examples/cron/panel-cron.sh) with its fictional JSON
+fixtures in dry-run mode before connecting real data. Cron is optional and is
+not installed automatically. Expected high-consumption windows, described
+below, are a separate optional feature managed by the server itself.
+
 ## Expected high consumption periods
 
 The panel can optionally indicate daily periods when you expect high household
