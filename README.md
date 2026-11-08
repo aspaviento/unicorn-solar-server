@@ -25,12 +25,12 @@ The project provides:
 
 ## Credits and project lineage
 
-Alberto Pizarro Carrasco developed Unicorn Solar Server to display household
+This project was developed to display household
 solar battery level, energy flow, electricity tariff, measured and scheduled
 consumption, and EV charging on the Unicorn HAT Mini.
 
 The project reuses the Flask/Vite structure and hardware wrapper from
-[Alberto's Unicorn Busy Server](https://github.com/aspaviento/unicorn-busy-server),
+[Unicorn Busy Server](https://github.com/aspaviento/unicorn-busy-server),
 based on [Elio Struyf's original Unicorn Busy Server](https://github.com/estruyf/unicorn-busy-server).
 Development was assisted by OpenAI Codex.
 
