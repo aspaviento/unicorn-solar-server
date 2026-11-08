@@ -63,7 +63,7 @@ class ConsumptionScheduleTest(unittest.TestCase):
         self.assertFalse(self.client.get('/api/status').json['highConsumptionExpected'])
 
     def test_invalid_settings_preserve_last_valid_configuration(self):
-        valid = {'windows': '08:00-09:00', 'timezone': 'UTC'}
+        valid = dict(schedule.DEFAULT_SETTINGS, windows='08:00-09:00', timezone='UTC')
         self.client.post('/api/settings', json=valid)
         before = self.path.read_bytes()
         for windows in ['25:00-26:00','08:60-09:00','8:00-09:00','08:00-08:00','08:00-09:00,',None,[],True]:
@@ -74,7 +74,7 @@ class ConsumptionScheduleTest(unittest.TestCase):
         self.assertEqual(server.consumption_settings,valid)
 
     def test_write_failure_keeps_runtime_and_file(self):
-        valid = {'windows': '08:00-09:00', 'timezone': 'UTC'}
+        valid = dict(schedule.DEFAULT_SETTINGS, windows='08:00-09:00', timezone='UTC')
         self.client.post('/api/settings', json=valid)
         with patch.object(schedule.os, 'replace', side_effect=OSError('write failure')):
             with self.assertLogs(server.app.logger, level='ERROR'):
@@ -100,6 +100,44 @@ class ConsumptionScheduleTest(unittest.TestCase):
             server.refresh_consumption_schedule()
         self.assertEqual(server.unicorn.pixels,before)
         self.assertEqual(server.state['lastCalled'],previous_update)
+
+    def test_household_telemetry_rendering_configuration_and_expiry(self):
+        payload = {'siteCurrentPowerFlow': {
+            'STORAGE': {'chargeLevel': 70, 'status': 'Idle'},
+            'GRID': {'currentPower': 1}, 'connections': [{'from': 'GRID'}],
+        }, 'householdPowerW': 3000, 'evCharging': True}
+        self.addCleanup(server.clear_household_telemetry)
+        with patch.object(schedule, 'is_active', return_value=True):
+            response = self.client.post('/api/solaredge-interface', json=payload)
+            self.assertTrue(response.json['highConsumptionMeasured'])
+            self.assertEqual(server.unicorn.pixels[2][6], server.HIGH_CONSUMPTION_COLOR)
+            self.assertEqual(server.unicorn.pixels[0][6], server.EV_CHARGING_COLOR)
+            self.assertEqual(server.unicorn.pixels[15][3], server.BAR_COLORS['red'])
+
+            settings = dict(schedule.DEFAULT_SETTINGS, highConsumptionThresholdW=3001, showEvCharging=False)
+            self.assertEqual(self.client.post('/api/settings', json=settings).status_code, 200)
+            self.assertFalse(self.client.get('/api/status').json['highConsumptionMeasured'])
+            self.assertEqual(server.unicorn.pixels[2][6], schedule.VIOLET)
+            self.assertEqual(server.unicorn.pixels[0][6], (0, 0, 0))
+
+            self.client.post('/api/settings', json=schedule.DEFAULT_SETTINGS)
+            with patch.object(server, 'monotonic',
+                              return_value=server.household_telemetry_received + server.HOUSEHOLD_TELEMETRY_TTL):
+                server.refresh_consumption_schedule()
+            status = self.client.get('/api/status').json
+            self.assertIsNone(status['highConsumptionMeasured'])
+            self.assertIsNone(status['evCharging'])
+            self.assertEqual(server.unicorn.pixels[2][6], schedule.VIOLET)
+            self.assertEqual(server.unicorn.pixels[0][6], (0, 0, 0))
+
+            self.client.post('/api/solaredge-interface', json=payload)
+            try:
+                self.client.post('/api/standby')
+                server.draw_standby_clock()
+                self.assertEqual(server.unicorn.pixels[0][6], (0, 0, 0))
+                self.assertIsNone(self.client.get('/api/status').json['evCharging'])
+            finally:
+                server.stop_animation()
 
     def test_schedule_never_wakes_other_modes(self):
         for mode in ['off','standby','rainbow']:

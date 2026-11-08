@@ -3,6 +3,18 @@
 Release notes describe changes to Unicorn Solar Server. Household deployment
 configuration is not part of this repository.
 
+## [1.3.0] - 2026-11-08
+
+### Added
+
+- Orange battery outline when measured household power reaches the configurable
+  threshold, 3000 W by default. Scheduled periods retain the violet outline
+  when measured high consumption is inactive.
+- Optional cyan EV charging pixel in the lower-left corner of the solar view.
+  The standby clock continues to show the connectivity indicator.
+- Optional `householdPowerW` and `evCharging` fields on the SolarEdge update
+  endpoint, with status reporting and configuration in the web panel.
+
 ## [1.2.0] - 2026-11-08
 
 ### Added
@@ -92,3 +104,5 @@ Server:
 [1.0.0]: https://github.com/aspaviento/unicorn-solar-server/releases/tag/v1.0.0
 
 [1.2.0]: https://github.com/aspaviento/unicorn-solar-server/releases/tag/v1.2.0
+
+[1.3.0]: https://github.com/aspaviento/unicorn-solar-server/releases/tag/v1.3.0

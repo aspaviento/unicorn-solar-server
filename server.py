@@ -43,6 +43,9 @@ CONNECTIVITY_COLORS = {
 STANDBY_BRIGHTNESS = 0.05
 STANDBY_COLOR = (128, 190, 255)
 WHITE = (245, 248, 252)
+HIGH_CONSUMPTION_COLOR = (255, 120, 0)
+EV_CHARGING_COLOR = (0, 220, 220)
+HOUSEHOLD_TELEMETRY_TTL = 600
 BAR_START_COLUMNS = (14, 11, 8, 5, 2)
 DISPLAY_WIDTH = 17
 DISPLAY_HEIGHT = 7
@@ -71,6 +74,8 @@ if (width, height) != (DISPLAY_WIDTH, DISPLAY_HEIGHT):
     )
 state = {
     'connectivity': {'state': 'unknown', 'updatedAt': None},
+    'householdPowerW': None,
+    'evCharging': None,
     'percentage': 0,
     'flow': 'charging',
     'barColor': 'green',
@@ -101,16 +106,34 @@ except (OSError, ValueError):
     consumption_settings = dict(schedule.DEFAULT_SETTINGS)
 consumption_active = schedule.is_active(consumption_settings)
 schedule_thread = None
+household_telemetry_received = None
 
 
-def refresh_consumption_schedule(now=None):
+def high_consumption_measured():
+    power = state['householdPowerW']
+    return None if power is None else power >= consumption_settings['highConsumptionThresholdW']
+
+
+def clear_household_telemetry():
+    global household_telemetry_received
+    household_telemetry_received = None
+    state.update(householdPowerW=None, evCharging=None)
+
+
+def refresh_consumption_schedule(now=None, repaint=False):
     """Only repaint solar mode on transitions; never wake standby/off/rainbow."""
     global consumption_active
     with hardware_lock:
         active = schedule.is_active(consumption_settings, now)
-        changed = active != consumption_active
+        expired = (
+            household_telemetry_received is not None
+            and monotonic() - household_telemetry_received >= HOUSEHOLD_TELEMETRY_TTL
+        )
+        if expired:
+            clear_household_telemetry()
+        changed = expired or active != consumption_active
         consumption_active = active
-        if changed and state['displayMode'] == 'solar':
+        if (changed or repaint) and state['displayMode'] == 'solar':
             render_display()
         return active
 
@@ -198,6 +221,8 @@ def render_display():
     columns_remaining = active_columns(state['percentage'])
     with hardware_lock:
         outline = schedule.VIOLET if schedule.is_active(consumption_settings) else WHITE
+        if high_consumption_measured():
+            outline = HIGH_CONSUMPTION_COLOR
         unicorn.clear()
         unicorn.setBrightness(0.5)
         for x in range(2, DISPLAY_WIDTH):
@@ -215,6 +240,8 @@ def render_display():
                 columns_remaining -= 1
         for y in (2, 3, 4):
             set_pixel(0, y, TARIFF_COLORS[state['tariff']])
+        if consumption_settings['showEvCharging'] and state['evCharging'] is True:
+            set_pixel(0, 6, EV_CHARGING_COLOR)
         draw_connectivity()
         unicorn.show()
 
@@ -376,6 +403,8 @@ def status_payload():
     return {
         **state,
         'highConsumptionExpected': schedule.is_active(consumption_settings),
+        'highConsumptionMeasured': high_consumption_measured(),
+        'showEvCharging': consumption_settings['showEvCharging'],
         'activeBlocks': columns // 2,
         'activeColumns': columns,
         'height': height,
@@ -417,7 +446,11 @@ def api_settings():
         if error_response is not None:
             return error_response
         try:
-            settings = schedule.validate_settings(content)
+            settings = schedule.validate_settings({
+                'highConsumptionThresholdW': consumption_settings['highConsumptionThresholdW'],
+                'showEvCharging': consumption_settings['showEvCharging'],
+                **content,
+            })
         except ValueError as error:
             return jsonify({'error': str(error)}), 400
         try:
@@ -426,7 +459,7 @@ def api_settings():
             app.logger.exception('Cannot save consumption settings')
             return jsonify({'error': 'Cannot save settings; previous configuration retained'}), 500
         consumption_settings = settings
-        refresh_consumption_schedule()
+        refresh_consumption_schedule(repaint=True)
         return jsonify(consumption_settings)
 
 
@@ -455,16 +488,29 @@ def api_battery():
 
 @app.route('/api/solaredge-interface', methods=['POST'])
 def api_solaredge_interface():
+    global household_telemetry_received
     content, error_response = read_json_body()
     if error_response is not None:
         return error_response
     solar_state, error_response = parse_solaredge_power_flow(content)
     if error_response is not None:
         return error_response
-    state.update(solar_state)
-    touch('/api/solaredge-interface')
-    render_solar_display()
-    return jsonify(status_payload())
+    power = content.get('householdPowerW')
+    if power is not None and (
+        type(power) not in (int, float) or not 0 <= power < math.inf
+    ):
+        return jsonify({'error': 'householdPowerW must be a finite non-negative number or null'}), 400
+    ev_charging = content.get('evCharging')
+    if ev_charging is not None and not isinstance(ev_charging, bool):
+        return jsonify({'error': 'evCharging must be a boolean or null'}), 400
+    stop_animation()
+    with hardware_lock:
+        household_telemetry_received = monotonic() if power is not None or ev_charging is not None else None
+        state.update(solar_state, householdPowerW=power, evCharging=ev_charging)
+        touch('/api/solaredge-interface')
+        state['displayMode'] = 'solar'
+        render_display()
+        return jsonify(status_payload())
 
 
 @app.route('/api/tariff', methods=['POST'])
@@ -490,6 +536,8 @@ def api_off():
 
 @app.route('/api/standby', methods=['GET', 'POST'])
 def api_standby():
+    with hardware_lock:
+        clear_household_telemetry()
     touch('/api/standby')
     start_standby_display()
     return jsonify(status_payload())

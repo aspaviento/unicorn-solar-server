@@ -36,13 +36,17 @@ rest:
           - barColor
           - connectivity
           - displayMode
+          - evCharging
           - flow
           - highConsumptionExpected
+          - highConsumptionMeasured
+          - householdPowerW
           - height
           - lastCalled
           - lastCalledApi
           - percentage
           - rotation
+          - showEvCharging
           - tariff
           - unicorn
           - width
@@ -61,9 +65,12 @@ configured daily consumption window. It is a scheduled expectation, not measured
 load or equipment state. This optional indication is disabled when no windows
 are configured. Set the windows in the Solar Server web panel, for example for
 a pool pump, irrigation system, or other scheduled household load. It does not
-require another integration. Add the attribute below to an existing
-REST sensor if upgrading. The sample card uses violet for the outline while
-this attribute is true, with up to the REST polling interval of delay.
+require another integration. The sample card uses orange when
+`highConsumptionMeasured` is true, violet during an expected window
+otherwise, and white outside it. `householdPowerW` reports the latest
+household power reading in watts. In solar mode, the bottom-left pixel is
+cyan when `evCharging` and `showEvCharging` are both true. Add the new
+attributes to an existing REST sensor to use the updated example.
 
 `connectivity` reports the last local watchdog result and its UTC receipt time
 (`updatedAt`). In the example card, the top-left pixel is green for
@@ -132,6 +139,8 @@ cards:
               yellow: "#ffbe00",
               white: "#f5f8fc",
               violet: "#bf70ff",
+              orange: "#ff7800",
+              cyan: "#00dcdc",
               off: "#202837"
             };
 
@@ -177,14 +186,20 @@ cards:
               return false;
             }
 
+            const outline = attrs.highConsumptionMeasured === true ? colors.orange
+              : attrs.highConsumptionExpected === true ? colors.violet : colors.white;
+
             for (let y = 0; y < 7; y++) {
               for (let x = 0; x < 17; x++) {
                 let color = colors.off;
-                if (isOutline(x, y)) color = attrs.highConsumptionExpected === true ? colors.violet : colors.white;
+                if (isOutline(x, y)) color = outline;
                 if (isBatteryFill(x, y)) color = barColor;
                 if (isTariff(x, y)) color = tariffColors[tariff] ?? colors.yellow;
 
                 if (x === 0 && y === 0) color = connectivityColors[attrs.connectivity?.state] ?? colors.off;
+
+                if (x === 0 && y === 6 && attrs.displayMode === "solar"
+                  && attrs.showEvCharging === true && attrs.evCharging === true) color = colors.cyan;
 
                 dots.push(renderDot(color));
               }

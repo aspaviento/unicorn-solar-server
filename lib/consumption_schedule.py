@@ -7,7 +7,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-DEFAULT_SETTINGS = {'windows': '', 'timezone': 'Europe/Madrid'}
+DEFAULT_SETTINGS = {
+    'windows': '',
+    'timezone': 'Europe/Madrid',
+    'highConsumptionThresholdW': 3000,
+    'showEvCharging': True,
+}
 VIOLET = (191, 112, 255)
 
 
@@ -40,7 +45,18 @@ def validate_settings(value):
         if start == end:
             raise ValueError('Window start and end must differ')
         normalized.append(item)
-    return {'windows': ','.join(normalized), 'timezone': tz}
+    threshold = value.get('highConsumptionThresholdW', DEFAULT_SETTINGS['highConsumptionThresholdW'])
+    if type(threshold) is not int or threshold <= 0:
+        raise ValueError('highConsumptionThresholdW must be a positive integer')
+    show_ev = value.get('showEvCharging', DEFAULT_SETTINGS['showEvCharging'])
+    if not isinstance(show_ev, bool):
+        raise ValueError('showEvCharging must be a boolean')
+    return {
+        'windows': ','.join(normalized),
+        'timezone': tz,
+        'highConsumptionThresholdW': threshold,
+        'showEvCharging': show_ev,
+    }
 
 
 def load_settings():

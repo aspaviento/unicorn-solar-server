@@ -13,6 +13,11 @@ type SolarStatus = {
   barColor: BarColor;
   tariff: Tariff;
   highConsumptionExpected?: boolean;
+  highConsumptionMeasured?: boolean | null;
+  evCharging?: boolean | null;
+  showEvCharging?: boolean;
+  displayMode?: string;
+  connectivity?: { state: string };
 };
 
 const barColors: Record<BarColor, string> = {
@@ -25,6 +30,12 @@ const tariffColors: Record<Tariff, string> = {
   low: 'rgb(0, 180, 80)',
   medium: 'rgb(255, 190, 0)',
   high: 'rgb(230, 55, 60)',
+};
+const connectivityColors: Partial<Record<string, string>> = {
+  connected: 'rgb(0, 180, 80)',
+  waiting_retry: 'rgb(255, 120, 0)',
+  recovering: 'rgb(255, 120, 0)',
+  disconnected: 'rgb(255, 45, 50)',
 };
 const barStartColumns = [14, 11, 8, 5, 2];
 const solaredgeExample = `{
@@ -47,8 +58,14 @@ const solaredgeExample = `{
 
 function pixelColor(status: SolarStatus, x: number, y: number) {
   if (x === 0 && [2, 3, 4].includes(y)) return tariffColors[status.tariff];
-  const outline = status.highConsumptionExpected ? 'rgb(191, 112, 255)' : 'rgb(245, 248, 252)';
-  if ((y === 0 || y === 6) && x >= 1) return outline;
+  if (x === 0 && y === 0) return connectivityColors[status.connectivity?.state ?? 'unknown'];
+  if (x === 0 && y === 6 && status.displayMode === 'solar' && status.showEvCharging && status.evCharging) {
+    return 'rgb(0, 220, 220)';
+  }
+  const outline = status.highConsumptionMeasured
+    ? 'rgb(255, 120, 0)'
+    : status.highConsumptionExpected ? 'rgb(191, 112, 255)' : 'rgb(245, 248, 252)';
+  if ((y === 0 || y === 6) && x >= 2) return outline;
   if ((x === 1 || x === 16) && y >= 1 && y <= 5) return outline;
   let columnsRemaining = status.activeColumns;
   for (const start of barStartColumns) {
@@ -218,7 +235,11 @@ export function App() {
         <div className="status-copy">
           <span className="status-kicker">{content.appName}</span>
           <h1>{status.percentage}%</h1>
-          {status.highConsumptionExpected && <p className="consumption-notice" role="status">{content.settings.active}</p>}
+          {status.highConsumptionMeasured
+            ? <p className="consumption-notice" role="status">{content.settings.measured}</p>
+            : status.highConsumptionExpected && <p className="consumption-notice" role="status">{content.settings.active}</p>}
+          {status.displayMode === 'solar' && status.showEvCharging && status.evCharging &&
+            <p className="consumption-notice" role="status">{content.settings.evCharging}</p>}
           <p>{content.panel.statusSummary(content.panel.flows[status.flow], content.panel.tariffs[status.tariff], status.activeColumns, status.activeBlocks)}</p>
         </div>
       </section>
@@ -289,6 +310,8 @@ export function App() {
 function ConsumptionSettings({ onSaved }: { onSaved: () => Promise<void> }) {
   const [windows, setWindows] = React.useState('');
   const [timezone, setTimezone] = React.useState('Europe/Madrid');
+  const [threshold, setThreshold] = React.useState('3000');
+  const [showEvCharging, setShowEvCharging] = React.useState(true);
   const [loaded, setLoaded] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
   const [message, setMessage] = React.useState('');
@@ -303,6 +326,8 @@ function ConsumptionSettings({ onSaved }: { onSaved: () => Promise<void> }) {
         if (!cancelled) {
           setWindows(settings.windows);
           setTimezone(settings.timezone);
+          setThreshold(String(settings.highConsumptionThresholdW));
+          setShowEvCharging(settings.showEvCharging);
           setLoaded(true);
         }
       } catch {
@@ -320,12 +345,14 @@ function ConsumptionSettings({ onSaved }: { onSaved: () => Promise<void> }) {
       const response = await fetch('/api/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ windows, timezone }),
+        body: JSON.stringify({ windows, timezone, highConsumptionThresholdW: Number(threshold), showEvCharging }),
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || response.statusText);
       setWindows(result.windows);
       setTimezone(result.timezone);
+      setThreshold(String(result.highConsumptionThresholdW));
+      setShowEvCharging(result.showEvCharging);
       setError(false);
       setMessage(content.settings.saved);
       onSaved().catch(() => {});
@@ -348,6 +375,13 @@ function ConsumptionSettings({ onSaved }: { onSaved: () => Promise<void> }) {
       <label htmlFor="consumption-timezone">{content.settings.timezone}</label>
       <input className="settings-input" id="consumption-timezone" type="text" required
         disabled={!loaded || saving} value={timezone} onChange={event => setTimezone(event.target.value)} />
+      <label htmlFor="consumption-threshold">{content.settings.threshold}</label>
+      <input className="settings-input" id="consumption-threshold" type="number" min="1" step="1" required
+        disabled={!loaded || saving} value={threshold} onChange={event => setThreshold(event.target.value)} />
+      <label>
+        <input type="checkbox" checked={showEvCharging} disabled={!loaded || saving}
+          onChange={event => setShowEvCharging(event.target.checked)} /> {content.settings.showEvCharging}
+      </label>
       <div className="button-row"><button type="submit" disabled={!loaded || saving}>
         {saving ? content.settings.saving : content.settings.save}
       </button></div>

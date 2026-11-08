@@ -3,7 +3,7 @@
 Display the battery, energy flow, and current electricity tariff of a domestic
 solar installation on a Raspberry Pi with a Pimoroni Unicorn HAT Mini.
 
-Current release: [v1.2.0](https://github.com/aspaviento/unicorn-solar-server/releases/tag/v1.2.0).
+Current release: [v1.3.0](https://github.com/aspaviento/unicorn-solar-server/releases/tag/v1.3.0).
 See the [changelog](CHANGELOG.md) for changes since v1.0.0 and the
 [security policy](SECURITY.md) for supported releases and private reporting.
 
@@ -40,8 +40,8 @@ The server requires the Unicorn HAT Mini's native 17x7 orientation. It sets
 rotation `0` and refuses to start with a different display shape so the battery
 cannot be silently cropped or rotated.
 
-- White pixels form the battery outline; configured expected high-consumption
-  periods change only that outline to violet.
+- The battery outline is orange for measured high consumption, violet during
+  an expected high-consumption period, and white otherwise.
 - Five inner blocks of two columns represent battery percentage, filling from
   right to left in 10% steps while preserving the gaps between blocks.
 - `0-9%` lights no columns. Each additional 10% lights one column, so `20%`
@@ -87,15 +87,16 @@ fixtures in dry-run mode before connecting real data. Cron is optional and is
 not installed automatically. Expected high-consumption windows, described
 below, are a separate optional feature managed by the server itself.
 
-## Expected high consumption periods
+## Household consumption and EV charging
 
 The panel can optionally indicate daily periods when you expect high household
 electricity consumption, for example from a pool filtration pump, an irrigation
 system, or other scheduled motors. This gives context for the battery level
 and energy flow without changing how those values or the tariff are displayed.
 
-**This feature is disabled by default.** If you do not configure any windows,
-the battery keeps its normal white outline. No other integration is required.
+No expected windows are configured by default. When a valid power reading
+meets the configured threshold, the outline is orange and takes priority over
+violet. Otherwise, the outline follows the schedule, with white outside it.
 
 To enable it, open **Configuration** in the web panel and enter daily windows
 as comma-separated `HH:MM-HH:MM` ranges, for example:
@@ -105,11 +106,11 @@ as comma-separated `HH:MM-HH:MM` ranges, for example:
 ```
 
 Select an IANA time zone (default `Europe/Madrid`) and click **Save
-configuration**. The battery outline is violet inside a configured window
-and white otherwise. Battery fill, energy-flow colors, brightness, and the
-tariff terminal remain unchanged. This is a **scheduled expectation**, not a
-power measurement or confirmation that equipment is running. The panel does
-not control the equipment; it simply highlights the periods you configure.
+configuration**. Set the measured threshold in watts (default 3000) and choose
+whether to show the EV charging indicator (enabled by default). A cyan pixel
+in the bottom-left corner indicates confirmed charging in the solar view.
+Battery fill, energy-flow colors, and the tariff terminal are independent of
+the outline and EV indicator.
 
 - Windows apply every day. Adjust them when seasonal equipment schedules change.
 - Start is inclusive and end is exclusive: `08:00-09:00` ends at exactly 09:00.
@@ -177,18 +178,25 @@ GET /api/settings
 POST /api/settings
 Content-Type: application/json
 
-{"windows": "08:00-09:00,12:00-14:00", "timezone": "Europe/Madrid"}
+{"windows": "08:00-09:00,12:00-14:00", "timezone": "Europe/Madrid", "highConsumptionThresholdW": 3000, "showEvCharging": true}
 ```
 
-GET returns the saved `windows` and `timezone`. POST requires both fields,
-validates them, and returns the normalized saved values. Invalid input returns
-HTTP 400; a persistence failure returns HTTP 500. Empty `windows` disables the
-indication. There is no default household schedule.
+GET returns the saved configuration. POST requires `windows` and `timezone`.
+Omitting `highConsumptionThresholdW` (a positive integer) or `showEvCharging`
+(a boolean) preserves its saved value. Empty `windows` disables scheduled
+indication. Invalid input returns HTTP 400 and a persistence failure returns
+HTTP 500.
 
-`GET /api/status` additionally returns `highConsumptionExpected`, a boolean
-computed from the current time, independently of the age of solar telemetry
-and the display mode. Schedule transitions do not change `lastCalled` or
-`lastCalledApi`, which continue to describe external display updates.
+Producers can add optional top-level fields alongside `siteCurrentPowerFlow`
+in `POST /api/solaredge-interface`: `householdPowerW` (instantaneous
+household load in watts) and `evCharging` (boolean). Omitted or null values
+mean unknown. The server applies the threshold on each update. Both readings
+are cleared on standby or after ten minutes without an update. The standby
+clock does not show the EV indicator.
+
+`GET /api/status` reports those readings, `showEvCharging`, and
+`highConsumptionMeasured` (boolean or null). `highConsumptionExpected`
+remains a boolean computed from the configured schedule.
 
 ### Update battery
 
