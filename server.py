@@ -127,7 +127,7 @@ def refresh_consumption_schedule(now=None, repaint=False):
         active = schedule.is_active(consumption_settings, now)
         expired = (
             household_telemetry_received is not None
-            and monotonic() - household_telemetry_received >= HOUSEHOLD_TELEMETRY_TTL
+            and monotonic() >= household_telemetry_received + HOUSEHOLD_TELEMETRY_TTL
         )
         if expired:
             clear_household_telemetry()

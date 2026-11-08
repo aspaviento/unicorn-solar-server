@@ -108,7 +108,9 @@ class ConsumptionScheduleTest(unittest.TestCase):
         }, 'householdPowerW': 3000, 'evCharging': True}
         self.addCleanup(server.clear_household_telemetry)
         with patch.object(schedule, 'is_active', return_value=True):
-            response = self.client.post('/api/solaredge-interface', json=payload)
+            # This timestamp loses precision when subtracting it from the deadline.
+            with patch.object(server, 'monotonic', return_value=7837.985890347726):
+                response = self.client.post('/api/solaredge-interface', json=payload)
             self.assertTrue(response.json['highConsumptionMeasured'])
             self.assertEqual(server.unicorn.pixels[2][6], server.HIGH_CONSUMPTION_COLOR)
             self.assertEqual(server.unicorn.pixels[0][6], server.EV_CHARGING_COLOR)
@@ -121,8 +123,11 @@ class ConsumptionScheduleTest(unittest.TestCase):
             self.assertEqual(server.unicorn.pixels[0][6], (0, 0, 0))
 
             self.client.post('/api/settings', json=schedule.DEFAULT_SETTINGS)
-            with patch.object(server, 'monotonic',
-                              return_value=server.household_telemetry_received + server.HOUSEHOLD_TELEMETRY_TTL):
+            deadline = server.household_telemetry_received + server.HOUSEHOLD_TELEMETRY_TTL
+            with patch.object(server, 'monotonic', return_value=deadline - 0.001):
+                server.refresh_consumption_schedule()
+            self.assertTrue(self.client.get('/api/status').json['highConsumptionMeasured'])
+            with patch.object(server, 'monotonic', return_value=deadline):
                 server.refresh_consumption_schedule()
             status = self.client.get('/api/status').json
             self.assertIsNone(status['highConsumptionMeasured'])
