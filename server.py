@@ -34,6 +34,12 @@ TARIFF_COLORS = {
     'medium': (255, 190, 0),
     'high': (230, 55, 60),
 }
+CONNECTIVITY_COLORS = {
+    'connected': (0, 180, 80),
+    'waiting_retry': (255, 120, 0),
+    'recovering': (255, 120, 0),
+    'disconnected': (255, 45, 50),
+}
 STANDBY_BRIGHTNESS = 0.05
 STANDBY_COLOR = (128, 190, 255)
 WHITE = (245, 248, 252)
@@ -64,6 +70,7 @@ if (width, height) != (DISPLAY_WIDTH, DISPLAY_HEIGHT):
         'Use a Unicorn HAT Mini at rotation 0.'
     )
 state = {
+    'connectivity': {'state': 'unknown', 'updatedAt': None},
     'percentage': 0,
     'flow': 'charging',
     'barColor': 'green',
@@ -164,6 +171,12 @@ def draw_digit(digit, x_offset, y_offset=1, color=STANDBY_COLOR):
                 set_pixel(x_offset + x, y_offset + y, color)
 
 
+def draw_connectivity():
+    color = CONNECTIVITY_COLORS.get(state['connectivity']['state'])
+    if color is not None:
+        set_pixel(0, 0, color)
+
+
 def draw_standby_clock(now=None):
     current_time = now or datetime.now()
     digits = current_time.strftime('%H%M')
@@ -176,6 +189,7 @@ def draw_standby_clock(now=None):
         set_pixel(8, 4, STANDBY_COLOR)
         draw_digit(digits[2], 10)
         draw_digit(digits[3], 14)
+        draw_connectivity()
         unicorn.show()
 
 
@@ -186,7 +200,7 @@ def render_display():
         outline = schedule.VIOLET if schedule.is_active(consumption_settings) else WHITE
         unicorn.clear()
         unicorn.setBrightness(0.5)
-        for x in range(1, DISPLAY_WIDTH):
+        for x in range(2, DISPLAY_WIDTH):
             set_pixel(x, 0, outline)
             set_pixel(x, 6, outline)
         for y in range(1, 6):
@@ -201,6 +215,7 @@ def render_display():
                 columns_remaining -= 1
         for y in (2, 3, 4):
             set_pixel(0, y, TARIFF_COLORS[state['tariff']])
+        draw_connectivity()
         unicorn.show()
 
 
@@ -379,6 +394,7 @@ def root():
 def api_index():
     return jsonify({
         'endpoints': {
+            'connectivity': {'methods': ['POST'], 'path': '/api/connectivity'},
             'settings': {'methods': ['GET', 'POST'], 'path': '/api/settings'},
             'battery': {'methods': ['POST'], 'path': '/api/battery'},
             'off': {'methods': ['GET', 'POST'], 'path': '/api/off'},
@@ -492,6 +508,30 @@ def api_rainbow():
         return make_response(jsonify({'error': error}), 400)
     touch('/api/rainbow')
     start_rainbow(brightness, speed)
+    return jsonify(status_payload())
+
+
+@app.route('/api/connectivity', methods=['POST'])
+def api_connectivity():
+    if request.remote_addr not in ('127.0.0.1', '::1'):
+        return jsonify({'error': 'Connectivity updates are local only'}), 403
+
+    content, error_response = read_json_body()
+    if error_response is not None:
+        return error_response
+    connectivity = content.get('state')
+    if not isinstance(connectivity, str) or connectivity not in CONNECTIVITY_COLORS:
+        return jsonify({'error': 'Invalid connectivity state'}), 400
+
+    with hardware_lock:
+        state['connectivity'] = {
+            'state': connectivity,
+            'updatedAt': datetime.now(timezone.utc).isoformat(),
+        }
+        if state['displayMode'] == 'standby':
+            draw_standby_clock()
+        elif state['displayMode'] == 'solar':
+            render_display()
     return jsonify(status_payload())
 
 

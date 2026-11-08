@@ -3,7 +3,7 @@
 ## Supported versions
 
 Security fixes target the latest published release of Unicorn Solar Server.
-At publication of this policy, that release is **v1.1.0**. Older releases,
+At publication of this policy, that release is **v1.2.0**. Older releases,
 including v1.0.0, do not receive separate security backports. Reports affecting
 development code are also welcome, but unreleased commits are not a supported
 release. Please reproduce against the latest release where practical.

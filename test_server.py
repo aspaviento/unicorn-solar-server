@@ -277,8 +277,10 @@ class SolarServerTest(unittest.TestCase):
             for y in range(server.DISPLAY_HEIGHT)
             if server.unicorn.pixels[x][y] != (0, 0, 0)
         ]
-        self.assertEqual(len(lit_pixels), 95)
-        for x in range(1, 17):
+        self.assertEqual(len(lit_pixels), 93)
+        self.assertNotIn((1, 0), lit_pixels)
+        self.assertNotIn((1, 6), lit_pixels)
+        for x in range(2, 17):
             self.assertEqual(server.unicorn.pixels[x][0], server.WHITE)
             self.assertEqual(server.unicorn.pixels[x][6], server.WHITE)
         for y in range(1, 6):

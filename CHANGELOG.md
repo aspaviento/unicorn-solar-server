@@ -3,6 +3,22 @@
 Release notes describe changes to Unicorn Solar Server. Household deployment
 configuration is not part of this repository.
 
+## [1.2.0] - 2026-11-08
+
+### Added
+
+- Loopback-only `POST /api/connectivity` for local watchdog reports and a
+  `connectivity` field in the status API.
+- A steady connectivity pixel in the top-left corner of the daytime matrix
+  and standby clock. Green shows gateway reachability, orange shows a retry
+  or recovery in progress, and red shows failed recovery.
+- Home Assistant REST sensor and dashboard examples for the connectivity pixel.
+
+### Changed
+
+- Trimmed the two left corners of the battery outline to separate the
+  connectivity pixel from the battery while preserving the tariff indicator.
+
 ## [1.1.0] — 2026-10-25
 
 This release collects the functionality added since the first public release,
@@ -74,3 +90,5 @@ Server:
 
 [1.1.0]: https://github.com/aspaviento/unicorn-solar-server/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/aspaviento/unicorn-solar-server/releases/tag/v1.0.0
+
+[1.2.0]: https://github.com/aspaviento/unicorn-solar-server/releases/tag/v1.2.0

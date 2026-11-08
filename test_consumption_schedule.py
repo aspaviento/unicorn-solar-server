@@ -94,7 +94,7 @@ class ConsumptionScheduleTest(unittest.TestCase):
             self.assertTrue(self.client.get('/api/status').json['highConsumptionExpected'])
         for x in range(17):
             for y in range(7):
-                outline = (x>=1 and y in (0,6)) or (x in (1,16) and 1<=y<=5)
+                outline = (x>=2 and y in (0,6)) or (x in (1,16) and 1<=y<=5)
                 self.assertEqual(server.unicorn.pixels[x][y],schedule.VIOLET if outline else before[x][y])
         with patch.object(schedule,'is_active',return_value=False):
             server.refresh_consumption_schedule()

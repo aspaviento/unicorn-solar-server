@@ -3,7 +3,7 @@
 Display the battery, energy flow, and current electricity tariff of a domestic
 solar installation on a Raspberry Pi with a Pimoroni Unicorn HAT Mini.
 
-Current release: [v1.1.0](https://github.com/aspaviento/unicorn-solar-server/releases/tag/v1.1.0).
+Current release: [v1.2.0](https://github.com/aspaviento/unicorn-solar-server/releases/tag/v1.2.0).
 See the [changelog](CHANGELOG.md) for changes since v1.0.0 and the
 [security policy](SECURITY.md) for supported releases and private reporting.
 
@@ -53,6 +53,10 @@ cannot be silently cropped or rotated.
   `100%`.
 - The three-pixel battery terminal represents the electricity tariff: green
   for low, yellow for medium, and red for high.
+
+The top-left pixel shows the latest local connectivity report.
+
+![Solar matrix with a green connectivity pixel separated from the violet battery outline by a dark pixel](assets/connectivity-display.png)
 
 | Battery level | Active columns | Complete blocks |
 |---:|---:|---:|
@@ -139,6 +143,32 @@ Manual file edits are loaded only on the next service start; prefer the panel.
 The normal startup rainbow still waits for the next solar/tariff update.
 
 ## API
+
+### Report local connectivity
+
+```http
+POST /api/connectivity
+Content-Type: application/json
+
+{"state": "connected"}
+```
+
+Call this endpoint over loopback from a connectivity monitor on the same host.
+The pixel in the top-left corner is visible in the daytime view and standby
+clock. It stays steadily lit according to the reported state.
+
+| State | Pixel | Meaning |
+| --- | --- | --- |
+| `connected` | Green | The monitor can reach the local gateway. |
+| `waiting_retry` | Orange | A check failed and the monitor is waiting to retry. |
+| `recovering` | Orange | Recovery is in progress. |
+| `disconnected` | Red | Recovery ended without restoring connectivity. |
+
+The endpoint returns the current status. The `connectivity` field in that
+response and in `GET /api/status` contains `state` and the UTC receipt time
+`updatedAt`. After startup, the state is `unknown` and the pixel stays dark
+until the first report. Updates preserve the display mode, including off and
+rainbow.
 
 ### Read or save configuration
 

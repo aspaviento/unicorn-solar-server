@@ -34,6 +34,7 @@ rest:
           - activeBlocks
           - activeColumns
           - barColor
+          - connectivity
           - displayMode
           - flow
           - highConsumptionExpected
@@ -63,6 +64,14 @@ a pool pump, irrigation system, or other scheduled household load. It does not
 require another integration. Add the attribute below to an existing
 REST sensor if upgrading. The sample card uses violet for the outline while
 this attribute is true, with up to the REST polling interval of delay.
+
+`connectivity` reports the last local watchdog result and its UTC receipt time
+(`updatedAt`). In the example card, the top-left pixel is green for
+`connected`, orange for `waiting_retry` or `recovering`, and red for
+`disconnected`. It stays dark when the attribute is missing or the server
+has yet to receive a report. The REST sensor's availability separately
+indicates whether Home Assistant can reach the server. If it is unreachable,
+the conditional matrix is hidden.
 
 ## Dashboard Card
 
@@ -109,6 +118,13 @@ cards:
             const barColorName = attrs.barColor ?? "green";
             const tariff = attrs.tariff ?? "medium";
 
+            const connectivityColors = {
+              connected: "#00b450",
+              waiting_retry: "#ff7800",
+              recovering: "#ff7800",
+              disconnected: "#ff2d32"
+            };
+
             const colors = {
               blue: "#1e78ff",
               green: "#00b450",
@@ -141,7 +157,7 @@ cards:
             const barStarts = [14, 11, 8, 5, 2];
 
             function isOutline(x, y) {
-              return ((y === 0 || y === 6) && x >= 1) || ((x === 1 || x === 16) && y >= 1 && y <= 5);
+              return ((y === 0 || y === 6) && x >= 2) || ((x === 1 || x === 16) && y >= 1 && y <= 5);
             }
 
             function isTariff(x, y) {
@@ -167,6 +183,8 @@ cards:
                 if (isOutline(x, y)) color = attrs.highConsumptionExpected === true ? colors.violet : colors.white;
                 if (isBatteryFill(x, y)) color = barColor;
                 if (isTariff(x, y)) color = tariffColors[tariff] ?? colors.yellow;
+
+                if (x === 0 && y === 0) color = connectivityColors[attrs.connectivity?.state] ?? colors.off;
 
                 dots.push(renderDot(color));
               }
