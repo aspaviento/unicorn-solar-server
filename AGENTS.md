@@ -53,6 +53,18 @@ npm run build
 - User-facing frontend labels and descriptions belong in
   `frontend/src/content.ts`.
 
+## Visual changes
+
+- Check each affected visual change in the hardware renderer, the built web
+  panel in a browser, and the Home Assistant dashboard example. Record which
+  checks used simulated data and which were verified on a live display or
+  dashboard. After an authorized deployment, verify the affected live surfaces
+  when available.
+- Keep the web panel and Home Assistant preview consistent with the display
+  design and test the indicators against representative API states.
+- Update the relevant README and integration guidance. Refresh any affected
+  screenshots or illustrations using synthetic data before publishing.
+
 ## Change Expectations
 
 - Keep API changes backward-compatible unless the user explicitly asks for a

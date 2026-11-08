@@ -54,7 +54,10 @@ cannot be silently cropped or rotated.
 - The three-pixel battery terminal represents the electricity tariff: green
   for low, yellow for medium, and red for high.
 
-The top-left pixel shows the latest local connectivity report.
+The top-left pixel shows the latest local connectivity report. The web panel
+refreshes the indicator automatically, and the
+[Home Assistant example](docs/home-assistant.md) shows the same colors.
+The panel screenshot and matrix example use sample data.
 
 ![Solar matrix with a green connectivity pixel separated from the violet battery outline by a dark pixel](assets/connectivity-display.png)
 
