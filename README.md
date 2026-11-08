@@ -23,16 +23,16 @@ The project provides:
 
 ![Unicorn Solar Server control panel](./assets/frontend.jpg)
 
-## Project lineage
+## Credits and project lineage
 
-Unicorn Solar Server is derived from
-[aspaviento/unicorn-busy-server](https://github.com/aspaviento/unicorn-busy-server),
-which is itself based on
-[estruyf/unicorn-busy-server](https://github.com/estruyf/unicorn-busy-server).
+Alberto Pizarro Carrasco developed Unicorn Solar Server to display household
+solar battery level, energy flow, electricity tariff, measured and scheduled
+consumption, and EV charging on the Unicorn HAT Mini.
 
-The derived project reuses the Flask/Vite structure and Unicorn hardware
-wrapper, but replaces the busy-light behavior with a solar battery display and
-a dedicated API. It was developed with assistance from OpenAI Codex.
+The project reuses the Flask/Vite structure and hardware wrapper from
+[Alberto's Unicorn Busy Server](https://github.com/aspaviento/unicorn-busy-server),
+based on [Elio Struyf's original Unicorn Busy Server](https://github.com/estruyf/unicorn-busy-server).
+Development was assisted by OpenAI Codex.
 
 ## Display
 
@@ -125,7 +125,7 @@ the outline and EV indicator.
 - The web preview polls status every five seconds. Its solar diagram remains
   informational even when the physical display is in another mode.
 
-![Optional consumption settings; empty windows disable the indication](assets/consumption-settings.png)
+![Configuration for scheduled windows, the measured consumption threshold, and the EV charging indicator](assets/consumption-settings.png)
 
 ### Persistent configuration
 
