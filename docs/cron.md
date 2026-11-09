@@ -22,7 +22,7 @@ fictional or generic. It needs no cloud account or credentials.
 | Classify the current tariff as low/medium/high | Your tariff integration or script |
 | Decide between solar display and standby clock | The cron controller below |
 | Render battery, tariff, or clock | Unicorn Solar Server |
-| Change white/violet outline for optional consumption windows | The server's internal schedule monitor |
+| Update the amber pixel for optional consumption windows | The server's internal schedule monitor |
 
 The server does **not** calculate sunrise/sunset, retrieve your battery state,
 or schedule night mode automatically. The web panel's consumption windows are
@@ -168,7 +168,7 @@ curl --fail --silent http://127.0.0.1:9001/api/status
 ```
 
 Expect `displayMode: solar` during the active period and `displayMode: standby`
-outside it. The schedule monitor may change the outline in solar mode, but
+outside it. The schedule monitor may change the consumption pixel in solar mode, but
 never interrupts standby. `highConsumptionExpected` can still be true while
 the physical panel is showing its clock.
 
@@ -195,7 +195,7 @@ The cadence is an example: with a five-minute interval, clock/daylight
 transitions can take up to approximately five minutes. Use a one-minute
 interval if that precision is needed. Local API updates do not require cloud
 queries every minute: schedule provider refreshes separately, within their
-quotas. The server's optional violet-outline transitions still run internally
+quotas. The server's scheduled consumption transitions still run internally
 every second, independently of this cron interval.
 
 Cron owns stdout/stderr redirection; the script does not write its own logs.

@@ -3,6 +3,14 @@
 Release notes describe changes to Unicorn Solar Server. Household deployment
 configuration is not part of this repository.
 
+## Unreleased
+
+### Changed
+
+- Keep the solar battery outline white and show household consumption in the
+  bottom-left pixel, with the cyan EV indicator to its right. Red means measured high
+  consumption and takes priority over amber for an expected window.
+
 ## [1.3.0] - 2026-11-08
 
 ### Added

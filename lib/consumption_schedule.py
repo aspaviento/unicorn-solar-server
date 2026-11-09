@@ -13,7 +13,6 @@ DEFAULT_SETTINGS = {
     'highConsumptionThresholdW': 3000,
     'showEvCharging': True,
 }
-VIOLET = (191, 112, 255)
 
 
 def settings_path():

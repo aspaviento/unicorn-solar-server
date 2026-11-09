@@ -40,8 +40,7 @@ The server requires the Unicorn HAT Mini's native 17x7 orientation. It sets
 rotation `0` and refuses to start with a different display shape so the battery
 cannot be silently cropped or rotated.
 
-- The battery outline is orange for measured high consumption, violet during
-  an expected high-consumption period, and white otherwise.
+- The battery outline is always white in the solar view.
 - Five inner blocks of two columns represent battery percentage, filling from
   right to left in 10% steps while preserving the gaps between blocks.
 - `0-9%` lights no columns. Each additional 10% lights one column, so `20%`
@@ -59,7 +58,7 @@ refreshes the indicator automatically, and the
 [Home Assistant example](docs/home-assistant.md) shows the same colors.
 The panel screenshot and matrix example use sample data.
 
-![Solar matrix with a green connectivity pixel separated from the violet battery outline by a dark pixel](assets/connectivity-display.png)
+![Solar matrix with green connectivity, a white battery outline, and a red consumption pixel at the bottom left and a cyan EV charging pixel beside it](assets/connectivity-display.png)
 
 | Battery level | Active columns | Complete blocks |
 |---:|---:|---:|
@@ -97,9 +96,14 @@ electricity consumption, for example from a pool filtration pump, an irrigation
 system, or other scheduled motors. This gives context for the battery level
 and energy flow without changing how those values or the tariff are displayed.
 
-No expected windows are configured by default. When a valid power reading
-meets the configured threshold, the outline is orange and takes priority over
-violet. Otherwise, the outline follows the schedule, with white outside it.
+No expected windows are configured by default. In the solar view, the
+bottom-left pixel indicates household consumption:
+
+| Pixel | Meaning |
+|---|---|
+| Red | The latest valid power reading meets or exceeds the threshold. |
+| Amber | An expected high-consumption window is active and red does not apply. |
+| Off | Neither condition applies. |
 
 To enable it, open **Configuration** in the web panel and enter daily windows
 as comma-separated `HH:MM-HH:MM` ranges, for example:
@@ -111,15 +115,15 @@ as comma-separated `HH:MM-HH:MM` ranges, for example:
 Select an IANA time zone (default `Europe/Madrid`) and click **Save
 configuration**. Set the measured threshold in watts (default 3000) and choose
 whether to show the EV charging indicator (enabled by default). A cyan pixel
-in the bottom-left corner indicates confirmed charging in the solar view.
+to the right of the consumption pixel indicates confirmed charging in the solar view.
 Battery fill, energy-flow colors, and the tariff terminal are independent of
-the outline and EV indicator.
+the consumption and EV indicators. Both indicators are off in standby.
 
 - Windows apply every day. Adjust them when seasonal equipment schedules change.
 - Start is inclusive and end is exclusive: `08:00-09:00` ends at exactly 09:00.
 - Overnight windows such as `23:00-01:00` are supported. Overlaps act as a union.
 - Equal start/end, invalid times, and invalid time zones are rejected.
-- Leave the windows field empty and save to disable the indication (the default).
+- Leave the windows field empty and save to disable the scheduled indication (the default).
 - IANA time zones automatically follow daylight saving changes. Repeated local
   times use the same window on both occurrences; skipped local times never occur.
 - A background monitor checks once per second; no new solar/tariff update or

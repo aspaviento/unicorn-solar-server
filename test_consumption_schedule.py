@@ -84,7 +84,7 @@ class ConsumptionScheduleTest(unittest.TestCase):
         self.assertEqual(schedule.load_settings(), valid)
         self.assertEqual(list(self.path.parent.iterdir()),[self.path])
 
-    def test_transition_only_changes_outline_without_new_solar_data(self):
+    def test_transition_only_changes_consumption_pixel_without_new_solar_data(self):
         server.state.update(percentage=70,tariff='low',barColor='yellow')
         server.render_display()
         before = deepcopy(server.unicorn.pixels)
@@ -94,8 +94,8 @@ class ConsumptionScheduleTest(unittest.TestCase):
             self.assertTrue(self.client.get('/api/status').json['highConsumptionExpected'])
         for x in range(17):
             for y in range(7):
-                outline = (x>=2 and y in (0,6)) or (x in (1,16) and 1<=y<=5)
-                self.assertEqual(server.unicorn.pixels[x][y],schedule.VIOLET if outline else before[x][y])
+                expected = server.EXPECTED_CONSUMPTION_COLOR if (x, y) == (0, 6) else before[x][y]
+                self.assertEqual(server.unicorn.pixels[x][y], expected)
         with patch.object(schedule,'is_active',return_value=False):
             server.refresh_consumption_schedule()
         self.assertEqual(server.unicorn.pixels,before)
@@ -112,15 +112,16 @@ class ConsumptionScheduleTest(unittest.TestCase):
             with patch.object(server, 'monotonic', return_value=7837.985890347726):
                 response = self.client.post('/api/solaredge-interface', json=payload)
             self.assertTrue(response.json['highConsumptionMeasured'])
-            self.assertEqual(server.unicorn.pixels[2][6], server.HIGH_CONSUMPTION_COLOR)
-            self.assertEqual(server.unicorn.pixels[0][6], server.EV_CHARGING_COLOR)
+            self.assertEqual(server.unicorn.pixels[0][6], server.HIGH_CONSUMPTION_COLOR)
+            self.assertEqual(server.unicorn.pixels[2][6], server.WHITE)
+            self.assertEqual(server.unicorn.pixels[1][6], server.EV_CHARGING_COLOR)
             self.assertEqual(server.unicorn.pixels[15][3], server.BAR_COLORS['red'])
 
             settings = dict(schedule.DEFAULT_SETTINGS, highConsumptionThresholdW=3001, showEvCharging=False)
             self.assertEqual(self.client.post('/api/settings', json=settings).status_code, 200)
             self.assertFalse(self.client.get('/api/status').json['highConsumptionMeasured'])
-            self.assertEqual(server.unicorn.pixels[2][6], schedule.VIOLET)
-            self.assertEqual(server.unicorn.pixels[0][6], (0, 0, 0))
+            self.assertEqual(server.unicorn.pixels[0][6], server.EXPECTED_CONSUMPTION_COLOR)
+            self.assertEqual(server.unicorn.pixels[1][6], (0, 0, 0))
 
             self.client.post('/api/settings', json=schedule.DEFAULT_SETTINGS)
             deadline = server.household_telemetry_received + server.HOUSEHOLD_TELEMETRY_TTL
@@ -132,14 +133,15 @@ class ConsumptionScheduleTest(unittest.TestCase):
             status = self.client.get('/api/status').json
             self.assertIsNone(status['highConsumptionMeasured'])
             self.assertIsNone(status['evCharging'])
-            self.assertEqual(server.unicorn.pixels[2][6], schedule.VIOLET)
-            self.assertEqual(server.unicorn.pixels[0][6], (0, 0, 0))
+            self.assertEqual(server.unicorn.pixels[0][6], server.EXPECTED_CONSUMPTION_COLOR)
+            self.assertEqual(server.unicorn.pixels[1][6], (0, 0, 0))
 
             self.client.post('/api/solaredge-interface', json=payload)
             try:
                 self.client.post('/api/standby')
                 server.draw_standby_clock()
                 self.assertEqual(server.unicorn.pixels[0][6], (0, 0, 0))
+                self.assertEqual(server.unicorn.pixels[1][6], (0, 0, 0))
                 self.assertIsNone(self.client.get('/api/status').json['evCharging'])
             finally:
                 server.stop_animation()

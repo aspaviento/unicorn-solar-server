@@ -43,7 +43,8 @@ CONNECTIVITY_COLORS = {
 STANDBY_BRIGHTNESS = 0.05
 STANDBY_COLOR = (128, 190, 255)
 WHITE = (245, 248, 252)
-HIGH_CONSUMPTION_COLOR = (255, 120, 0)
+EXPECTED_CONSUMPTION_COLOR = (255, 191, 0)
+HIGH_CONSUMPTION_COLOR = (255, 45, 64)
 EV_CHARGING_COLOR = (0, 220, 220)
 HOUSEHOLD_TELEMETRY_TTL = 600
 BAR_START_COLUMNS = (14, 11, 8, 5, 2)
@@ -220,17 +221,14 @@ def render_display():
     """Render the solar state as a horizontal battery on a 17x7 matrix."""
     columns_remaining = active_columns(state['percentage'])
     with hardware_lock:
-        outline = schedule.VIOLET if schedule.is_active(consumption_settings) else WHITE
-        if high_consumption_measured():
-            outline = HIGH_CONSUMPTION_COLOR
         unicorn.clear()
         unicorn.setBrightness(0.5)
         for x in range(2, DISPLAY_WIDTH):
-            set_pixel(x, 0, outline)
-            set_pixel(x, 6, outline)
+            set_pixel(x, 0, WHITE)
+            set_pixel(x, 6, WHITE)
         for y in range(1, 6):
-            set_pixel(1, y, outline)
-            set_pixel(16, y, outline)
+            set_pixel(1, y, WHITE)
+            set_pixel(16, y, WHITE)
         for start_x in BAR_START_COLUMNS:
             for x in (start_x + 1, start_x):
                 if columns_remaining <= 0:
@@ -241,7 +239,11 @@ def render_display():
         for y in (2, 3, 4):
             set_pixel(0, y, TARIFF_COLORS[state['tariff']])
         if consumption_settings['showEvCharging'] and state['evCharging'] is True:
-            set_pixel(0, 6, EV_CHARGING_COLOR)
+            set_pixel(1, 6, EV_CHARGING_COLOR)
+        if high_consumption_measured():
+            set_pixel(0, 6, HIGH_CONSUMPTION_COLOR)
+        elif schedule.is_active(consumption_settings):
+            set_pixel(0, 6, EXPECTED_CONSUMPTION_COLOR)
         draw_connectivity()
         unicorn.show()
 

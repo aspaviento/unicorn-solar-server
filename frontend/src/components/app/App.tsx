@@ -59,12 +59,14 @@ const solaredgeExample = `{
 function pixelColor(status: SolarStatus, x: number, y: number) {
   if (x === 0 && [2, 3, 4].includes(y)) return tariffColors[status.tariff];
   if (x === 0 && y === 0) return connectivityColors[status.connectivity?.state ?? 'unknown'];
-  if (x === 0 && y === 6 && status.displayMode === 'solar' && status.showEvCharging && status.evCharging) {
+  if (x === 1 && y === 6 && status.displayMode === 'solar' && status.showEvCharging && status.evCharging) {
     return 'rgb(0, 220, 220)';
   }
-  const outline = status.highConsumptionMeasured
-    ? 'rgb(255, 120, 0)'
-    : status.highConsumptionExpected ? 'rgb(191, 112, 255)' : 'rgb(245, 248, 252)';
+  if (x === 0 && y === 6 && status.displayMode === 'solar') {
+    if (status.highConsumptionMeasured) return 'rgb(255, 45, 64)';
+    if (status.highConsumptionExpected) return 'rgb(255, 191, 0)';
+  }
+  const outline = 'rgb(245, 248, 252)';
   if ((y === 0 || y === 6) && x >= 2) return outline;
   if ((x === 1 || x === 16) && y >= 1 && y <= 5) return outline;
   let columnsRemaining = status.activeColumns;
